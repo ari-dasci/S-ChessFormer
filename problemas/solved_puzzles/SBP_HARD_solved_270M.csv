@@ -1,0 +1,11 @@
+FEN,Moves,Moves_UCI,Played,Correct
+1r3rk1/p1n2ppp/b7/P1p1P3/1pNbN3/1P4PB/5P1P/2RR2K1 w - - 0 1,Ncd6,c4d6,c4d6,True
+5rk1/4qpbp/1p2r1p1/pNp1n3/2Pp2P1/3P3P/PP1BPRQ1/5RK1 b - - 0 1,g5,g6g5,g6g5,True
+8/1prr1pkp/4nRp1/2qB2P1/pp2P1PP/P5Q1/1P6/1K3R2 w - - 0 1,axb4,a3b4,g3e5,False
+r4r1k/p1pb4/1p1p3p/3Pq3/2P2p2/3pBN2/PPQ2P1P/6RK w - - 0 1,Qxd3,c2d3,c2d3,True
+2k4r/2p2rpp/3b1n2/Npp1p1B1/4P3/3R1P2/PP3P1P/3R2K1 w - - 0 1,Rb3,d3b3,d3b3,True
+3r1rk1/b2qnpp1/p1pp3p/4p3/P1P1P3/BN4P1/4PPKP/1R1Q1R2 b - - 0 1,c5,c6c5,c6c5,True
+r2qnrk1/1pp1bppp/p7/3Pp1B1/4P3/P1N2Q2/1P3PPP/2RR2K1 w - - 0 1,Bxe7,g5e7,g5e3,False
+r1q4k/1p3rp1/2pnbp1p/2N5/PR1Pp1P1/4P2P/1Q3PB1/3R2K1 w - - 0 1,Nxe6,c5e6,c5e6,True
+rr6/3nnpk1/2q1b1pp/p1ppP3/PpP2Q1P/5N2/1PBN1PP1/R3R1K1 b - - 0 1,b3,b4b3,b4b3,True
+2rq1rk1/3nbp1p/p1b1p3/1pp2p2/2PP4/1P3NP1/P2NQPBP/3R1RK1 w - - 0 1,d5,d4d5,d4d5,True
