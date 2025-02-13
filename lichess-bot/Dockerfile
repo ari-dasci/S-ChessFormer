@@ -27,5 +27,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
+ENV PYTHONPATH=/app/engines:$PYTHONPATH
+
 # Command to run the application
 CMD ["python", "lichess-bot.py"]
