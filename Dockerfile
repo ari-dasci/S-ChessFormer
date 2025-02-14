@@ -17,10 +17,10 @@ ENV PATH="/opt/conda/envs/lichess_env/bin:$PATH"
 RUN conda run -n lichess_env pip install -r requirements.txt
 
 # Establece PYTHONPATH
-RUN PYTHONPATH="/app/lichess-bot/engines:$PYTHONPATH"
+RUN export PYTHONPATH="/app/lichess-bot/engines:$PYTHONPATH"
+ENV PYTHONPATH=/app/lichess-bot/engines:$PYTHONPATH
 
 WORKDIR /app/lichess-bot
 
 # Comando por defecto para ejecutar el bot
 CMD ["conda", "run", "-n", "lichess_env", "python", "lichess-bot.py"]
-
