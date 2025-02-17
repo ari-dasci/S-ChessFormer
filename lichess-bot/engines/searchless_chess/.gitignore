@@ -1,3 +1,4 @@
 data/*
+!data/download.sh
 checkpoints/*
 !checkpoints/download.sh
