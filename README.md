@@ -20,5 +20,8 @@ Para lanzar el bot en lichess, simplemente debes ejecutar los siguientes comando
 
 ```
 cd lichess-bot
-python3 lichess-bot.py
+python3 lichess-bot.py --name ENGINE_NAME
 ```
+Donde ENGINE\_NAME puede ser `ThinkLess_9M`, `ThinkLess_136M` o `ThinkLess_270M`.
+
+Alternativamente, si se quiere ejecutar el proceso como un batch en una cola SLURM, se puede emplear el script `run_bot.sh`.
