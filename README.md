@@ -20,6 +20,24 @@ Para lanzar el bot en lichess, simplemente debes ejecutar los siguientes comando
 
 ```
 cd lichess-bot
+```
+
+Antes de lanzar el script principal debes asegurarte de:
+
+- Estás en el entorno conda adecuado. Esto es, en `lichess_bot`. En caso contrario, ejecuta
+```
+conda activate lichess_bot
+```
+
+- Tienes la variable de entorno PYTHONPATH exportada. Si no es así (te saldrá como error que no encuentra el módulo `searchless_chess` al intentar desplegar el bot), ejecuta
+
+```
+export PYTHONPATH="$PWD/engines:$PYTHONPATH"
+```
+
+Finalmente, lanza el bot con el siguiente comando:
+
+```
 python3 lichess-bot.py --engine_name ENGINE_NAME
 ```
 Donde ENGINE\_NAME puede ser `ThinkLess_9M`, `ThinkLess_136M` o `ThinkLess_270M`.
