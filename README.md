@@ -20,7 +20,7 @@ Para lanzar el bot en lichess, simplemente debes ejecutar los siguientes comando
 
 ```
 cd lichess-bot
-python3 lichess-bot.py --name ENGINE_NAME
+python3 lichess-bot.py --engine_name ENGINE_NAME
 ```
 Donde ENGINE\_NAME puede ser `ThinkLess_9M`, `ThinkLess_136M` o `ThinkLess_270M`.
 
