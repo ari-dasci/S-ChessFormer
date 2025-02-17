@@ -23,4 +23,5 @@ ENV PYTHONPATH=/app/lichess-bot/engines:$PYTHONPATH
 WORKDIR /app/lichess-bot
 
 # Comando por defecto para ejecutar el bot
-CMD ["conda", "run", "-n", "lichess_env", "python", "lichess-bot.py"]
+# Cambiar ThinkLess_9M por el motor a usar
+CMD ["conda", "run", "-n", "lichess_env", "python", "lichess-bot.py", "--engine_name", "ThinkLess_9M"]	

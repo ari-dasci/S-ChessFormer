@@ -135,5 +135,46 @@ class ThinkLess_9M(ExampleEngine):
 
         # Devolvemos la jugada
         return PlayResult(predicted_move, None)
+        
+class ThinkLess_136M(ExampleEngine):
+    """
+    Get a move using searchless chess 136M parameters engine.
+    """
+    def __init__(self, commands, options, stderr, draw_or_resign, game, cwd=None):  # Agregamos `cwd` para evitar el error
+        # Guardamos el motor en un atributo de la clase
+        super().__init__(commands, options, stderr, draw_or_resign, game, cwd=None)
+        self.search_engine = constants.ENGINE_BUILDERS['136M']()
 
+    def search(self,
+               board: chess.Board,
+               time_limit: Limit,
+               ponder: bool,  # noqa: ARG002
+               draw_offered: bool,
+               root_moves: MOVE):
+        # Usamos el motor para realizar la predicción
+        predicted_move = self.search_engine.play(board=board).uci()
+
+        # Devolvemos la jugada
+        return PlayResult(predicted_move, None)
+
+class ThinkLess_270M(ExampleEngine):
+    """
+    Get a move using searchless chess 270M parameters engine.
+    """
+    def __init__(self, commands, options, stderr, draw_or_resign, game, cwd=None):  # Agregamos `cwd` para evitar el error
+        # Guardamos el motor en un atributo de la clase
+        super().__init__(commands, options, stderr, draw_or_resign, game, cwd=None)
+        self.search_engine = constants.ENGINE_BUILDERS['270M']()
+
+    def search(self,
+               board: chess.Board,
+               time_limit: Limit,
+               ponder: bool,  # noqa: ARG002
+               draw_offered: bool,
+               root_moves: MOVE):
+        # Usamos el motor para realizar la predicción
+        predicted_move = self.search_engine.play(board=board).uci()
+
+        # Devolvemos la jugada
+        return PlayResult(predicted_move, None)
 
