@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /mnt/homeGPU/jorgelerre/lichess-bot
+cd "$(pwd)"
 
 # Verificar si conda ya está instalado
 if ! command -v conda &> /dev/null
