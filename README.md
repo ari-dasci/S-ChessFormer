@@ -42,4 +42,4 @@ python3 lichess-bot.py --engine_name ENGINE_NAME
 ```
 Donde ENGINE\_NAME puede ser `ThinkLess_9M`, `ThinkLess_136M` o `ThinkLess_270M`.
 
-Alternativamente, si se quiere ejecutar el proceso como un batch en una cola SLURM, se puede emplear el script `run_bot.sh`.
+Alternativamente, si se quiere ejecutar el proceso como un batch en una cola SLURM, se puede emplear el script `run_bot_dios.sh` o `run_bot_dgx.sh`, en función de en qué cola quiera lanzarse. Si se quiere lanzar en otra cola, simplemente se debe indicar al inicio del script.
