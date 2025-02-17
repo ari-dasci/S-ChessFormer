@@ -9,6 +9,12 @@ Para instalar las dependencias que lanzan el bot, utiliza el siguiente script. E
 ./install.sh
 ```
 
+Previo lanzamiento del script asegúrate de dar permisos de ejecución.
+
+```
+chmod +x install.sh
+```
+
 
 Para lanzar el bot en lichess, simplemente debes ejecutar los siguientes comandos:
 
