@@ -30,8 +30,11 @@ from absl import flags
 import chess
 import chess.engine
 import chess.pgn
+import chess.svg
 import pandas as pd
 import numpy as np
+
+from jax import random as jrandom
 
 
 def minimax(board, engine, depth, alpha, beta, maximizing_player):
@@ -225,17 +228,8 @@ class ThinkMore_9M(ExampleEngine):
         # y poder obtener las valoraciones de cada movimiento.
         policy = 'action_value'
         num_return_buckets = 128
-
-        match policy:
-            case 'action_value':
-                output_size = num_return_buckets
-            case 'behavioral_cloning':
-                output_size = utils.NUM_ACTIONS
-            case 'state_value':
-                output_size = num_return_buckets
-            case _:
-                raise ValueError(f'Unknown policy: {policy}')
-
+        output_size = num_return_buckets
+       
         predictor_config = transformer.TransformerConfig(
             vocab_size=utils.NUM_ACTIONS,
             output_size=output_size,
@@ -254,7 +248,7 @@ class ThinkMore_9M(ExampleEngine):
         checkpoint_dir = os.path.join(
         
         os.getcwd(),
-            f'../checkpoints/9M',
+            f'engines/searchless_chess/checkpoints/9M',
         )
         dummy_params = predictor.initial_params(
             rng=jrandom.PRNGKey(6400000),
@@ -272,7 +266,7 @@ class ThinkMore_9M(ExampleEngine):
             num_return_buckets
         )
 
-        neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
+        self.neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
             return_buckets_values=return_buckets_values,
             predict_fn=predict_fn,
             temperature=0.005,
@@ -286,14 +280,13 @@ class ThinkMore_9M(ExampleEngine):
                root_moves: MOVE):
         
             top_move = None
-        
+            depth = 5
             # Opposite of our minimax
             if board.turn == chess.WHITE:
                 top_eval = -np.inf
             else:
                 top_eval = np.inf
                 
-            win_probs, actions = evaluate_actions(board) 
             for move in board.legal_moves:
                 board.push(move)
 
@@ -329,7 +322,7 @@ class ThinkMore_9M(ExampleEngine):
     
     def minimax(self, board, depth, alpha, beta, maximizing_player):
         if depth == 0 or board.is_game_over():
-            win_probs, actions = evaluate_actions(self, board)
+            win_probs, actions = self.evaluate_actions(self, board)
             if maximizing_player:
                 best_win_prob = max(win_probs)
             else:

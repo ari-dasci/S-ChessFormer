@@ -1189,6 +1189,8 @@ def start_lichess_bot() -> None:
     	CONFIG.config["token"] = "lip_GBJB0wugOJ1HKmcQ73BH"
     elif(CONFIG.config["engine"]["name"] == "ThinkLess_270M"):
     	CONFIG.config["token"] = "lip_jGsz5xa77xtJi3mFiYfG"
+    elif(CONFIG.config["engine"]["name"] == "ThinkMore_9M"):
+        CONFIG.config["token"] = "lip_Xs0xWHLgOylndYB8XGir"
     	
     	
     if not args.disable_auto_logging:
