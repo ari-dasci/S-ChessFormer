@@ -102,6 +102,17 @@ def centipawns_to_win_probability(centipawns: int) -> float:
   """
   return 0.5 + 0.5 * (2 / (1 + math.exp(-0.00368208 * centipawns)) - 1)
 
+def win_probability_to_centipawns(win_probability: float) -> int:
+  """Returns the centipawn score converted from the win probability (in [0, 1]).
+
+  Args:
+    win_probability: The win probability in the range [0, 1].
+  """
+  if not 0 <= win_probability <= 1:
+    raise ValueError("Win probability must be in the range [0, 1].")
+  
+  centipawns = -1 / 0.00368208 * math.log((1 - win_probability) / win_probability)
+  return int(centipawns)
 
 def get_uniform_buckets_edges_values(
     num_buckets: int,

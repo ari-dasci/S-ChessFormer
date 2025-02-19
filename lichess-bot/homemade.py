@@ -13,6 +13,12 @@ import logging
 # Imports for searchless_chess
 from engines.searchless_chess.src.engines import constants
 from engines.searchless_chess.src.engines import engine as engine_lib   
+from searchless_chess.src import tokenizer
+from searchless_chess.src import training_utils
+from searchless_chess.src import transformer
+from searchless_chess.src import utils
+from searchless_chess.src.engines import engine
+from searchless_chess.src.engines import neural_engines
 
 from collections.abc import Sequence
 import io
@@ -25,7 +31,35 @@ import chess
 import chess.engine
 import chess.pgn
 import pandas as pd
+import numpy as np
 
+
+def minimax(board, engine, depth, alpha, beta, maximizing_player):
+  if depth == 0 or board.is_game_over():
+    return 
+  
+  if maximizing_player:
+    max_eval = -np.inf
+    for move in board.legal_moves:
+      board.push(move)
+      eval = minimax(board, depth - 1, alpha, beta, False)
+      board.pop()
+      max_eval = max(max_eval, eval)
+      alpha = max(alpha, eval)
+      if beta <= alpha:
+        break
+    return max_eval
+  else:
+    min_eval = np.inf
+    for move in board.legal_moves:
+      board.push(move)
+      eval = minimax(board, depth - 1, alpha, beta, True)
+      board.pop()
+      min_eval = min(min_eval, eval)
+      beta = min(beta, eval)
+      if beta <= alpha:
+        break
+    return min_eval
 
 
 # Use this logger variable to print messages to the console or log files.
@@ -178,3 +212,149 @@ class ThinkLess_270M(ExampleEngine):
         # Devolvemos la jugada
         return PlayResult(predicted_move, None)
 
+
+class ThinkMore_9M(ExampleEngine):
+    """
+    Get a move using searchless chess 9M parameters engine with tree search.
+    """
+    def __init__(self, commands, options, stderr, draw_or_resign, game, cwd=None):  # Agregamos `cwd` para evitar el error
+        super().__init__(commands, options, stderr, draw_or_resign, game, cwd=None)
+        
+        # Guardamos el motor 9M en un atributo de la clase
+        # Esta vez lo hacemos de forma manual para tener un mejor control de la arquitectura
+        # y poder obtener las valoraciones de cada movimiento.
+        policy = 'action_value'
+        num_return_buckets = 128
+
+        match policy:
+            case 'action_value':
+                output_size = num_return_buckets
+            case 'behavioral_cloning':
+                output_size = utils.NUM_ACTIONS
+            case 'state_value':
+                output_size = num_return_buckets
+            case _:
+                raise ValueError(f'Unknown policy: {policy}')
+
+        predictor_config = transformer.TransformerConfig(
+            vocab_size=utils.NUM_ACTIONS,
+            output_size=output_size,
+            pos_encodings=transformer.PositionalEncodings.LEARNED,
+            max_sequence_length=tokenizer.SEQUENCE_LENGTH + 2,
+            num_heads=8,
+            num_layers=8,
+            embedding_dim=256,
+            apply_post_ln=True,
+            apply_qk_layernorm=False,
+            use_causal_mask=False,
+        )
+
+        predictor = transformer.build_transformer_predictor(config=predictor_config)
+
+        checkpoint_dir = os.path.join(
+        
+        os.getcwd(),
+            f'../checkpoints/9M',
+        )
+        dummy_params = predictor.initial_params(
+            rng=jrandom.PRNGKey(6400000),
+            targets=np.zeros((1, 1), dtype=np.uint32),
+        )
+        params = training_utils.load_parameters(
+            checkpoint_dir=checkpoint_dir,
+            params=dummy_params,
+            use_ema_params=True,
+            step=-1,
+        )
+        
+        predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=1)
+        _, return_buckets_values = utils.get_uniform_buckets_edges_values(
+            num_return_buckets
+        )
+
+        neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
+            return_buckets_values=return_buckets_values,
+            predict_fn=predict_fn,
+            temperature=0.005,
+        )
+
+    def search(self,
+               board: chess.Board,
+               time_limit: Limit,
+               ponder: bool,  # noqa: ARG002
+               draw_offered: bool,
+               root_moves: MOVE):
+        
+            top_move = None
+        
+            # Opposite of our minimax
+            if board.turn == chess.WHITE:
+                top_eval = -np.inf
+            else:
+                top_eval = np.inf
+                
+            win_probs, actions = evaluate_actions(board) 
+            for move in board.legal_moves:
+                board.push(move)
+
+                # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
+                eval = minimax(board, self.eval_engine, depth - 1, -np.inf, np.inf, board.turn)
+
+                board.pop()
+
+                if board.turn == chess.WHITE:
+                    if eval > top_eval:
+                        top_move = move
+                        top_eval = eval
+                else:
+                    if eval < top_eval:
+                        top_move = move
+                        top_eval = eval
+
+            print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
+
+            # Devolvemos la jugada
+            return PlayResult(top_move, None)
+        
+    def evaluate_actions(self, board):
+        results = self.neural_engine.analyse(board)
+        buckets_log_probs = results['log_probs']
+
+        # Compute the expected return.
+        win_probs = np.inner(np.exp(buckets_log_probs), return_buckets_values)
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+
+        return win_probs, sorted_legal_moves
+    
+    
+    def minimax(self, board, depth, alpha, beta, maximizing_player):
+        if depth == 0 or board.is_game_over():
+            win_probs, actions = evaluate_actions(self, board)
+            if maximizing_player:
+                best_win_prob = max(win_probs)
+            else:
+                best_win_prob = min(win_probs)
+            return best_win_prob
+        
+        if maximizing_player:
+            max_eval = -np.inf
+            for move in board.legal_moves:
+                board.push(move)
+                eval = minimax(board, depth - 1, alpha, beta, False)
+                board.pop()
+                max_eval = max(max_eval, eval)
+                alpha = max(alpha, eval)
+                if beta <= alpha:
+                    break
+                return max_eval
+        else:
+            min_eval = np.inf
+            for move in board.legal_moves:
+                board.push(move)
+                eval = minimax(board, depth - 1, alpha, beta, True)
+                board.pop()
+                min_eval = min(min_eval, eval)
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break
+                return min_eval

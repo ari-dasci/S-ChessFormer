@@ -45,6 +45,11 @@ def _build_neural_engine(
       num_layers = 8
       embedding_dim = 256
       num_heads = 8
+    case '9M_state_value':
+      policy = 'state_value'
+      num_layers = 8
+      embedding_dim = 256
+      num_heads = 8
     case '136M':
       policy = 'action_value'
       num_layers = 8
@@ -116,6 +121,9 @@ ENGINE_BUILDERS = {
     'local': functools.partial(_build_neural_engine, model_name='local'),
     '9M': functools.partial(
         _build_neural_engine, model_name='9M', checkpoint_step=6_400_000
+    ),
+    '9M_state_value': functools.partial(
+        _build_neural_engine, model_name='9M_state_value', checkpoint_step=.
     ),
     '136M': functools.partial(
         _build_neural_engine, model_name='136M', checkpoint_step=6_400_000
