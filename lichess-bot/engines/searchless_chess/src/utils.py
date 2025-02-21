@@ -104,7 +104,7 @@ def centipawns_to_win_probability(centipawns: int) -> float:
 
 def win_probability_to_centipawns(win_probability: float) -> int:
   """Returns the centipawn score converted from the win probability (in [0, 1]).
-
+  
   Args:
     win_probability: The win probability in the range [0, 1].
   """

@@ -1184,13 +1184,13 @@ def start_lichess_bot() -> None:
     CONFIG = load_config(args.config or "./config.yml")
     CONFIG.config["engine"]["name"] = args.engine_name
     if(CONFIG.config["engine"]["name"] == "ThinkLess_9M"):
-    	CONFIG.config["token"] = "lip_Xs0xWHLgOylndYB8XGir"
-    elif(CONFIG.config["engine"]["name"] == "ThinkLess_136M"):
-    	CONFIG.config["token"] = "lip_GBJB0wugOJ1HKmcQ73BH"
-    elif(CONFIG.config["engine"]["name"] == "ThinkLess_270M"):
-    	CONFIG.config["token"] = "lip_jGsz5xa77xtJi3mFiYfG"
-    elif(CONFIG.config["engine"]["name"] == "ThinkMore_9M"):
         CONFIG.config["token"] = "lip_Xs0xWHLgOylndYB8XGir"
+    elif(CONFIG.config["engine"]["name"] == "ThinkLess_136M"):
+        CONFIG.config["token"] = "lip_GBJB0wugOJ1HKmcQ73BH"
+    elif(CONFIG.config["engine"]["name"] == "ThinkLess_270M"):
+        CONFIG.config["token"] = "lip_jGsz5xa77xtJi3mFiYfG"
+    elif(CONFIG.config["engine"]["name"] == "ThinkMore_9M"):
+        CONFIG.config["token"] = "lip_qqsbhn2uXf6nt9qEEoWR"
     	
     	
     if not args.disable_auto_logging:

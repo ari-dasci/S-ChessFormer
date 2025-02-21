@@ -17,6 +17,7 @@ from searchless_chess.src import tokenizer
 from searchless_chess.src import training_utils
 from searchless_chess.src import transformer
 from searchless_chess.src import utils
+#from searchless_chess.src.utils import win_probability_to_centipawns
 from searchless_chess.src.engines import engine
 from searchless_chess.src.engines import neural_engines
 
@@ -24,6 +25,8 @@ from collections.abc import Sequence
 import io
 import os
 import sys
+import math
+
 
 from absl import app
 from absl import flags
@@ -37,32 +40,6 @@ import numpy as np
 from jax import random as jrandom
 
 
-def minimax(board, engine, depth, alpha, beta, maximizing_player):
-  if depth == 0 or board.is_game_over():
-    return 
-  
-  if maximizing_player:
-    max_eval = -np.inf
-    for move in board.legal_moves:
-      board.push(move)
-      eval = minimax(board, depth - 1, alpha, beta, False)
-      board.pop()
-      max_eval = max(max_eval, eval)
-      alpha = max(alpha, eval)
-      if beta <= alpha:
-        break
-    return max_eval
-  else:
-    min_eval = np.inf
-    for move in board.legal_moves:
-      board.push(move)
-      eval = minimax(board, depth - 1, alpha, beta, True)
-      board.pop()
-      min_eval = min(min_eval, eval)
-      beta = min(beta, eval)
-      if beta <= alpha:
-        break
-    return min_eval
 
 
 # Use this logger variable to print messages to the console or log files.
@@ -216,6 +193,18 @@ class ThinkLess_270M(ExampleEngine):
         return PlayResult(predicted_move, None)
 
 
+def win_probability_to_centipawns(win_probability: float) -> int:
+  """Returns the centipawn score converted from the win probability (in [0, 1]).
+  
+  Args:
+    win_probability: The win probability in the range [0, 1].
+  """
+  if not 0 <= win_probability <= 1:
+    raise ValueError("Win probability must be in the range [0, 1].")
+  
+  centipawns = -1 / 0.00368208 * math.log((1 - win_probability) / win_probability)
+  return int(centipawns)
+
 class ThinkMore_9M(ExampleEngine):
     """
     Get a move using searchless chess 9M parameters engine with tree search.
@@ -262,12 +251,13 @@ class ThinkMore_9M(ExampleEngine):
         )
         
         predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=1)
-        _, return_buckets_values = utils.get_uniform_buckets_edges_values(
+        
+        _, self.return_buckets_values = utils.get_uniform_buckets_edges_values(
             num_return_buckets
         )
 
         self.neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
-            return_buckets_values=return_buckets_values,
+            return_buckets_values=self.return_buckets_values,
             predict_fn=predict_fn,
             temperature=0.005,
         )
@@ -280,18 +270,21 @@ class ThinkMore_9M(ExampleEngine):
                root_moves: MOVE):
         
             top_move = None
-            depth = 5
+            depth = 3
             # Opposite of our minimax
             if board.turn == chess.WHITE:
                 top_eval = -np.inf
             else:
                 top_eval = np.inf
-                
+            #print('--------------INIT MINIMAX--------------')
             for move in board.legal_moves:
                 board.push(move)
+                
+                #print("EVALUATING MOVE: ", move)
 
                 # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
-                eval = minimax(board, self.eval_engine, depth - 1, -np.inf, np.inf, board.turn)
+                #print("Turno:", board.turn)
+                eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
 
                 board.pop()
 
@@ -304,7 +297,7 @@ class ThinkMore_9M(ExampleEngine):
                         top_move = move
                         top_eval = eval
 
-            print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
+            #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
 
             # Devolvemos la jugada
             return PlayResult(top_move, None)
@@ -314,40 +307,52 @@ class ThinkMore_9M(ExampleEngine):
         buckets_log_probs = results['log_probs']
 
         # Compute the expected return.
-        win_probs = np.inner(np.exp(buckets_log_probs), return_buckets_values)
+        win_probs = np.inner(np.exp(buckets_log_probs), self.return_buckets_values)
         sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        #print('WIN PROBS: ', win_probs)
+        #print('SORTED LEGAL MOVES: ', sorted_legal_moves)
+        
+        for i in np.argsort(win_probs)[:-3:-1]:
+            print(i)
+            cp = win_probability_to_centipawns(win_probs[i])
+            print(f'  {sorted_legal_moves[i].uci()} -> {100*win_probs[i]:.1f}% cp: {cp}')
 
         return win_probs, sorted_legal_moves
     
     
     def minimax(self, board, depth, alpha, beta, maximizing_player):
+        #print("DEPTH: ", depth)
         if depth == 0 or board.is_game_over():
-            win_probs, actions = self.evaluate_actions(self, board)
+            win_probs, _ = self.evaluate_actions(board)
             if maximizing_player:
-                best_win_prob = max(win_probs)
-            else:
                 best_win_prob = min(win_probs)
+            else:
+                best_win_prob = max(win_probs)
+            #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
             return best_win_prob
         
         if maximizing_player:
             max_eval = -np.inf
             for move in board.legal_moves:
+                #print("EVALUATING MOVE: ", move)
                 board.push(move)
-                eval = minimax(board, depth - 1, alpha, beta, False)
+                eval = self.minimax(board, depth - 1, alpha, beta, False)
                 board.pop()
                 max_eval = max(max_eval, eval)
                 alpha = max(alpha, eval)
                 if beta <= alpha:
+                    #print(f"Poda: {beta} <= {alpha}")
                     break
-                return max_eval
+            return max_eval
         else:
             min_eval = np.inf
             for move in board.legal_moves:
                 board.push(move)
-                eval = minimax(board, depth - 1, alpha, beta, True)
+                eval = self.minimax(board, depth - 1, alpha, beta, True)
                 board.pop()
                 min_eval = min(min_eval, eval)
                 beta = min(beta, eval)
                 if beta <= alpha:
+                    #print(f"Poda: {beta} <= {alpha}")
                     break
-                return min_eval
+            return min_eval
