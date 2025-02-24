@@ -12,7 +12,7 @@ fi
 
 ENGINE_NAME="$1"
 
-cd /mnt/homeGPU/jorgelerre/lichess-bot
+cd "$(pwd)"
 
 # Inicializa Conda para bash
 source /opt/anaconda/etc/profile.d/conda.sh
