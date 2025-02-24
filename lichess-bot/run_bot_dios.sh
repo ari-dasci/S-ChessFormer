@@ -34,6 +34,9 @@ conda install pip -y
 # Instala las dependencias desde el archivo requirements.txt
 pip install -r requirements.txt
 
+# Usa la GPU
+pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
 # Exporta la variable de entorno PYTHONPATH
 export PYTHONPATH="$PWD/engines:$PYTHONPATH"
 
