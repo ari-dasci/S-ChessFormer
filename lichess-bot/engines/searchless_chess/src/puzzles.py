@@ -29,6 +29,8 @@ import pandas as pd
 from searchless_chess.src.engines import constants
 from searchless_chess.src.engines import engine as engine_lib
 
+import metrics_TFM
+import engines.stockfish_engine as stock_eng
 
 _NUM_PUZZLES = flags.DEFINE_integer(
     name='num_puzzles',
@@ -78,7 +80,16 @@ def evaluate_puzzle_from_board(
     board: chess.Board,
     moves: Sequence[str],
     engine: engine_lib.Engine,
+    stockfish_depth
 ) -> bool:
+  probabilities = []
+  # Initialize Stockfish for scores
+  limit = chess.engine.Limit(depth=stockfish_depth)
+  st_engine = stock_eng.AllMovesStockfishEngine(limit)
+
+  num_puzzle = 1
+  metrics_TFM.createProbFile()
+
   """Returns True if the `engine` solves the puzzle and False otherwise."""
   for move_idx, move in enumerate(moves):
     # According to https://database.lichess.org/#puzzles, the FEN is the
@@ -90,10 +101,17 @@ def evaluate_puzzle_from_board(
       # Lichess puzzles consider all mate-in-1 moves as correct, so we need to
       # check if the `predicted_move` results in a checkmate if it differs from
       # the solution.
+
+      prob_i = metrics_TFM.computeProbabilities(predicted_move,board,st_engine,metrics_TFM.TAYLOR_FUNCTION)
+      probabilities.append(prob_i)
       if move != predicted_move:
         board.push(chess.Move.from_uci(predicted_move))
         return board.is_checkmate()
     board.push(chess.Move.from_uci(move))
+    metrics_TFM.writeProbabilities(num_puzzle,probabilities)
+    probabilities = []
+    num_puzzle = num_puzzle+1
+
   return True
 
 
