@@ -30,6 +30,11 @@ import pandas as pd
 from searchless_chess.src.engines import constants
 from searchless_chess.src.engines import engine as engine_lib
 
+import metrics_TFM
+import engines.stockfish_engine as stock_eng
+
+import numpy as np
+
 
 _INPUT_FILE = flags.DEFINE_string(
     name='input_file',
@@ -72,12 +77,49 @@ _AGENT = flags.DEFINE_enum(
 
 
 def evaluate_puzzle_from_board(
+    index,
     board: chess.Board,
     move: str,
     engine: engine_lib.Engine,
+    stockfish_depth
 ) -> bool:
   """Returns True if the `engine` makes the right move and False otherwise."""
+  
+  # Metrics accord Stockfish
+  probs_St_accord_St = []
+  probs_LST_accord_St = []
+  centipawnss_St_accord_St = []
+  centipawnss_LST_accord_St = []
+
+  # Metrics accord LST
+  probs_St_accord_LST = []
+  probs_LST_accord_LST = []
+  centipawnss_St_accord_LST = []
+  centipawnss_LST_accord_LST = []
+
+  # Initialize Stockfish for scores
+  limit = chess.engine.Limit(depth=stockfish_depth)
+  st_engine = stock_eng.AllMovesStockfishEngine(limit)
+
+  metrics_TFM.createCSVFile()
+  
   predicted_move = engine.play(board=board).uci()
+  predicted_move_St = st_engine.play(board=board).uci()
+
+  pi_St_accord_St, pi_LST_accord_St, centipawns_St_accord_St, centipawns_LST_accord_St = metrics_TFM.computeMetricsAccordStockfish(predicted_move,predicted_move_St,board,st_engine,metrics_TFM.TAYLOR_FUNCTION)
+  pi_St_accord_LST,pi_LST_accord_LST,centipawns_St_accord_LST,centipawns_LST_accord_LST = metrics_TFM.computeMetricsAccordLST(predicted_move,predicted_move_St,board,engine,metrics_TFM.TAYLOR_FUNCTION)
+  
+  probs_St_accord_St.append(pi_St_accord_St)
+  probs_LST_accord_St.append(pi_LST_accord_St)
+  centipawnss_St_accord_St.append(centipawns_St_accord_St)
+  centipawnss_LST_accord_St.append(centipawns_LST_accord_St)
+
+  probs_St_accord_LST.append(pi_St_accord_LST)
+  probs_LST_accord_LST.append(pi_LST_accord_LST)
+  centipawnss_St_accord_LST.append(centipawns_St_accord_LST)
+  centipawnss_LST_accord_LST.append(centipawns_LST_accord_LST)
+
+  metrics_TFM.writeWithinCSV(index,predicted_move_St,predicted_move,probs_St_accord_St,probs_LST_accord_St,centipawnss_St_accord_St,centipawnss_LST_accord_St,np.abs(probs_St_accord_St-probs_LST_accord_St),np.abs(centipawnss_St_accord_St-centipawnss_LST_accord_St),probs_St_accord_LST,probs_LST_accord_LST,centipawnss_St_accord_LST,centipawnss_LST_accord_LST,np.abs(probs_St_accord_LST-probs_LST_accord_LST),np.abs(centipawnss_St_accord_LST-centipawnss_LST_accord_LST))
   # Lichess puzzles consider all mate-in-1 moves as correct, so we need to
   # check if the `predicted_move` results in a checkmate if it differs from
   # the solution.
@@ -85,6 +127,10 @@ def evaluate_puzzle_from_board(
     board.push(chess.Move.from_uci(predicted_move))
     return board.is_checkmate(), predicted_move
     
+  # If we decide to solve puzzles with more than a movement, we should do it
+  #probs_St_accord_St = probs_LST_accord_St = centipawnss_St_accord_St = centipawnss_LST_accord_St = []
+  #probs_St_accord_LST = probs_LST_accord_LST = centipawnss_St_accord_LST = centipawnss_LST_accord_LST = []
+  
   return True, predicted_move
 
 
@@ -116,6 +162,7 @@ def main(argv: Sequence[str]) -> None:
     move = puzzle['Moves_UCI']
     # Predecimos la jugada
     correct, play = evaluate_puzzle_from_board(
+        index,
         board=board,
         move=move,
         engine=engine
