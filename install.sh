@@ -33,6 +33,18 @@ if ! conda env list | grep -q "lichess_bot"; then
     # Si el entorno no existe, lo crea
     echo "Creando entorno Conda 'lichess_bot'..."
     conda create --name lichess_bot python=3.10 --yes
+        
+    # Activa el entorno Conda
+    conda activate lichess_bot
+
+    # Instala pip si es necesario
+    conda install pip -y
+
+    # Instala las dependencias desde el archivo requirements.txt
+    pip install -r requirements.txt
+
+    # Usa la GPU
+    pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 else
     echo "El entorno Conda 'lichess_bot' ya existe."
 fi
@@ -40,13 +52,7 @@ fi
 # Activa el entorno Conda
 conda activate lichess_bot
 
-# Instala pip si es necesario
-conda install pip
-
-# Instala las dependencias desde el archivo requirements.txt
-pip install -r requirements.txt
-
 # Exporta la variable de entorno PYTHONPATH
-# Cambiar /mnt/homeGPU/jorgelerre por la ubicacion en tu sistema
 export PYTHONPATH="$PWD/engines:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
