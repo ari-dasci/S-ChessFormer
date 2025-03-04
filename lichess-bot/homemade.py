@@ -11,8 +11,8 @@ from lib.lichess_types import MOVE, HOMEMADE_ARGS_TYPE
 import logging
 
 # Imports for searchless_chess
-from engines.searchless_chess.src.engines import constants
-from engines.searchless_chess.src.engines import engine as engine_lib   
+from searchless_chess.src.engines import constants
+from searchless_chess.src.engines import engine as engine_lib   
 from searchless_chess.src import tokenizer
 from searchless_chess.src import training_utils
 from searchless_chess.src import transformer
