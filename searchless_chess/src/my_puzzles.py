@@ -30,7 +30,6 @@ import pandas as pd
 from searchless_chess.src.engines import constants
 from searchless_chess.src.engines import engine as engine_lib
 
-import metrics_TFM
 import engines.stockfish_engine as stock_eng
 
 import numpy as np
@@ -217,7 +216,7 @@ def main(argv: Sequence[str]) -> None:
   results_list = []
   
   # Analizamos todos los puzzles
-  for _, puzzle in puzzles[:10].iterrows():
+  for _, puzzle in puzzles.iterrows():
     board = chess.Board(puzzle['FEN'])
     move = puzzle['Moves_UCI']
     # Predecimos la jugada con LST
