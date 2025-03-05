@@ -87,9 +87,10 @@ def _build_neural_engine(
   )
 
   predictor = transformer.build_transformer_predictor(config=predictor_config)
+  file_dir = os.path.dirname(os.path.abspath(__file__))
   checkpoint_dir = os.path.join(
-      os.getcwd(),
-      f'../searchless_chess/checkpoints/{model_name}',
+      file_dir,
+      f'../../checkpoints/{model_name}'
   )
   params = training_utils.load_parameters(
       checkpoint_dir=checkpoint_dir,
