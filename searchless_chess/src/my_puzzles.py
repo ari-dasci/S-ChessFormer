@@ -30,7 +30,6 @@ import pandas as pd
 from searchless_chess.src.engines import constants
 from searchless_chess.src.engines import engine as engine_lib
 
-import metrics_TFM
 import engines.stockfish_engine as stock_eng
 
 import numpy as np
