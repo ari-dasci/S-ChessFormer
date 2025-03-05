@@ -34,11 +34,12 @@ import metrics_TFM
 import engines.stockfish_engine as stock_eng
 
 import numpy as np
+from utils import centipawns_to_win_probability, win_probability_to_centipawns
 
 
 _INPUT_FILE = flags.DEFINE_string(
     name='input_file',
-    default="../problemas/unsolved_puzzles/SBP_HARD.csv",
+    default="../../problemas/unsolved_puzzles/SBP_HARD.csv",
     help='The input file name containing the puzzles to solve, in .csv.',
     required=False,
 )
@@ -75,68 +76,117 @@ _AGENT = flags.DEFINE_enum(
     required=False,
 )
 
+_ORACLE = flags.DEFINE_enum(
+    name='oracle',
+    default='stockfish_all_moves',
+    enum_values=[
+        'local',
+        '9M',
+        '136M',
+        '270M',
+        'stockfish',
+        'stockfish_all_moves',
+        'leela_chess_zero_depth_1',
+        'leela_chess_zero_policy_net',
+        'leela_chess_zero_400_sims',
+    ],
+    help='The oracle to use to grant the solution and give metrics.',
+    required=False,
+)
 
-def evaluate_puzzle_from_board(
-    index,
+
+def analyse_puzzle_from_board_with_LST(
     board: chess.Board,
-    move: str,
-    engine: engine_lib.Engine,
-    stockfish_depth
-) -> bool:
-  """Returns True if the `engine` makes the right move and False otherwise."""
+    engine: engine_lib.Engine
+) -> pd.DataFrame:
+  """Returns the evaluation of all posible moves by LST (or a neural model), ordered by CP."""
+  
+  # Obtenemos la jugada del motor a evaluar (LST)
+  buckets_log_probs = engine.analyse(board)['log_probs']
+  win_probs = np.inner(np.exp(buckets_log_probs), engine._return_buckets_values)
+  sorted_legal_moves = engine_lib.get_ordered_legal_moves(board)
+  """
+  print('Jugadas:', sorted_legal_moves)
+  print('Probabilidades:', win_probs)
+  
+  for i in np.argsort(win_probs)[::-1]:
+    print(i)
+    cp = win_probability_to_centipawns(win_probs[i])
+    print(f'  {sorted_legal_moves[i].uci()} -> {100*win_probs[i]:.1f}% cp: {cp}')
+  """
+  df_results = pd.DataFrame({
+    'Jugada LST': [move.uci() for move in sorted_legal_moves],
+    '%win LST': win_probs,
+    'CP LST': [win_probability_to_centipawns(p) for p in win_probs]
+  })
+  
+  df_results = df_results.sort_values(by='%win LST', ascending=False).reset_index(drop=True)
+  
+  return df_results
 
-  # Metrics accord Stockfish
-  probs_St_accord_St = []
-  probs_LST_accord_St = []
-  centipawnss_St_accord_St = []
-  centipawnss_LST_accord_St = []
 
-  # Metrics accord LST
-  probs_St_accord_LST = []
-  probs_LST_accord_LST = []
-  centipawnss_St_accord_LST = []
-  centipawnss_LST_accord_LST = []
+def analyse_puzzle_from_board_with_Stockfish(
+    board: chess.Board,
+    engine: engine_lib.Engine
+) -> pd.DataFrame:
+  """Returns the evaluation of all posible moves by Stockfish, ordered by CP."""
+  
+  # Obtenemos las valoraciones de Stockfish
+  analysis_results_1 = engine.analyse(board)['scores']
+  moves = [move.uci() for move, _ in analysis_results_1]
+  moves_cp = [eval_.score(mate_score=3000) for _, eval_ in analysis_results_1] # Un mate se penaliza con 3000 CP
+  
+  results_df = pd.DataFrame({
+    'Jugada Stockfish': moves,
+    '%win Stockfish': [centipawns_to_win_probability(cp) for cp in moves_cp],  
+    'CP Stockfish': moves_cp
+  })
+  
+  # Ordenamos las jugadas de mejor a peor
+  results_df = results_df.sort_values(by='CP Stockfish', ascending=False).reset_index(drop=True)
+  
+  return results_df
 
-  # Initialize Stockfish for scores
-  limit = chess.engine.Limit(depth=stockfish_depth)
-  st_engine = stock_eng.AllMovesStockfishEngine(limit)
+def compute_puzzle_metrics(
+  results_lst: pd.DataFrame,
+  results_sf: pd.DataFrame,
+  correct_move: str
+) -> pd.DataFrame:
+  """Returns the metrics of the puzzle."""
+  
+  # Obtenemos la mejor jugada de cada modelo
+  best_move_lst = results_lst.iloc[0]['Jugada LST']
+  best_move_sf = results_sf.iloc[0]['Jugada Stockfish']
+  print(correct_move, best_move_lst, best_move_sf)
+  # Devolvemos ambas en un dataframe
+  results_df = pd.DataFrame({
+    # Métricas para el mejor movimiento
+    '%win_LST_best_move': [results_lst[results_lst['Jugada LST'] == correct_move]['%win LST'].values[0]],
+    '%win_Stockfish_best_move': [results_sf[results_sf['Jugada Stockfish'] == correct_move]['%win Stockfish'].values[0]],
+    'CP_LST_best_move': [results_lst[results_lst['Jugada LST'] == correct_move]['CP LST'].values[0]],
+    'CP_Stockfish_best_move': [results_sf[results_sf['Jugada Stockfish'] == correct_move]['CP Stockfish'].values[0]],
+    # Métricas para el movimiento de LST 
+    'move_LST': [best_move_lst], 
+    'correct_LST': [best_move_lst == correct_move],
+    '%win_LST_move_LST': [results_lst[results_lst['Jugada LST'] == best_move_lst]['%win LST'].values[0]],
+    '%win_Stockfish_move_LST': [results_sf[results_sf['Jugada Stockfish'] == best_move_lst]['%win Stockfish'].values[0]],
+    'CP_LST_move_LST': [results_lst[results_lst['Jugada LST'] == best_move_lst]['CP LST'].values[0]],
+    'CP_Stockfish_move_LST': [results_sf[results_sf['Jugada Stockfish'] == best_move_lst]['CP Stockfish'].values[0]],
+    # Métricas para el movimiento de Stockfish
+    'move_Stockfish': [best_move_sf],
+    'correct_Stockfish': [best_move_sf == correct_move],
+    '%win_LST_move_Stockfish': [results_lst[results_lst['Jugada LST'] == best_move_sf]['%win LST'].values[0]],
+    '%win_Stockfish_move_Stockfish': [results_sf[results_sf['Jugada Stockfish'] == best_move_sf]['%win Stockfish'].values[0]],
+    'CP_LST_move_Stockfish': [results_lst[results_lst['Jugada LST'] == best_move_sf]['CP LST'].values[0]],
+    'CP_Stockfish_move_Stockfish': [results_sf[results_sf['Jugada Stockfish'] == best_move_sf]['CP Stockfish'].values[0]]
+  })
 
-  metrics_TFM.createCSVFile()
+  return results_df
 
-  predicted_move = engine.play(board=board).uci()
-  predicted_move_St = st_engine.play(board=board).uci()
-  #print(f'Mov predicho por LST: {predicted_move}')
-  #print(f'Mov predicho por Stockfish: {predicted_move_St}')
-  pi_St_accord_St, pi_LST_accord_St, centipawns_St_accord_St, centipawns_LST_accord_St = metrics_TFM.computeMetricsAccordStockfish(predicted_move,predicted_move_St,board,st_engine,metrics_TFM.TAYLOR_FUNCTION)
-  pi_St_accord_LST,pi_LST_accord_LST,centipawns_St_accord_LST,centipawns_LST_accord_LST = metrics_TFM.computeMetricsAccordLST(predicted_move,predicted_move_St,board,engine,metrics_TFM.TAYLOR_FUNCTION)
-
-  probs_St_accord_St.append(pi_St_accord_St)
-  probs_LST_accord_St.append(pi_LST_accord_St)
-  centipawnss_St_accord_St.append(centipawns_St_accord_St)
-  centipawnss_LST_accord_St.append(centipawns_LST_accord_St)
-
-  probs_St_accord_LST.append(pi_St_accord_LST)
-  probs_LST_accord_LST.append(pi_LST_accord_LST)
-  centipawnss_St_accord_LST.append(centipawns_St_accord_LST)
-  centipawnss_LST_accord_LST.append(centipawns_LST_accord_LST)
-
-  metrics_TFM.writeWithinCSV(index,predicted_move_St,predicted_move,probs_St_accord_St,probs_LST_accord_St,centipawnss_St_accord_St,centipawnss_LST_accord_St,np.abs(np.array(probs_St_accord_St,dtype=float)-np.array(probs_LST_accord_St,dtype=float)),np.abs(np.array(centipawnss_St_accord_St,dtype=float)-np.array(centipawnss_LST_accord_St,dtype=float)),probs_St_accord_LST,probs_LST_accord_LST,centipawnss_St_accord_LST,centipawnss_LST_accord_LST,np.abs(np.array(probs_St_accord_LST,dtype=float)-np.array(probs_LST_accord_LST,dtype=float)),np.abs(np.array(centipawnss_St_accord_LST,dtype=float)-np.array(centipawnss_LST_accord_LST,dtype=float)))
-  # Lichess puzzles consider all mate-in-1 moves as correct, so we need to
-  # check if the `predicted_move` results in a checkmate if it differs from
-  # the solution.
-  if move != predicted_move:
-    board.push(chess.Move.from_uci(predicted_move))
-    return board.is_checkmate(), predicted_move
-
-  # If we decide to solve puzzles with more than a movement, we should do it
-  #probs_St_accord_St = probs_LST_accord_St = centipawnss_St_accord_St = centipawnss_LST_accord_St = []
-  #probs_St_accord_LST = probs_LST_accord_LST = centipawnss_St_accord_LST = centipawnss_LST_accord_LST = []
-
-  return True, predicted_move
 
 
 def main(argv: Sequence[str]) -> None:
-
+  
   # Lectura de parametros
   n = len(sys.argv)
   puzzles_file = _INPUT_FILE.value
@@ -150,33 +200,51 @@ def main(argv: Sequence[str]) -> None:
     puzzles = pd.read_csv(puzzles_file)
   else:
     puzzles = pd.read_csv(puzzles_file, nrows=_NUM_PUZZLES.value)
+    
   # Obtenemos el motor de ajedrez a analizar
-  engine = constants.ENGINE_BUILDERS[_AGENT.value]()
-  stockfish_depth=1
+  engine_lst = constants.ENGINE_BUILDERS[_AGENT.value]()
+  
+  # Obtenemos el motor de ajedrez a usar como oraculo
+  # Por defecto, se usa stockfish con time_limit = 0.05
+  engine_oracle = constants.ENGINE_BUILDERS[_ORACLE.value]()
+  
+  # Opcion alternativa: limitar por profundidad
+  #stockfish_depth = 10
+  #limit = chess.engine.Limit(depth=stockfish_depth)
+  #engine_oracle = stock_eng.AllMovesStockfishEngine(limit)
+  
   # Añadimos una nueva columna "Played" y otra "Correct" al dataframe
-  puzzles['Played'] = None
-  puzzles['Correct'] = None
-
+  results_list = []
+  
   # Analizamos todos los puzzles
-  for index, puzzle in puzzles.iterrows():
+  for _, puzzle in puzzles[:10].iterrows():
     board = chess.Board(puzzle['FEN'])
     move = puzzle['Moves_UCI']
-    # Predecimos la jugada
-    correct, play = evaluate_puzzle_from_board(
-        index,
+    # Predecimos la jugada con LST
+    results_LST = analyse_puzzle_from_board_with_LST(
         board=board,
-        move=move,
-        engine=engine,
-        stockfish_depth=stockfish_depth
+        engine=engine_lst
     )
+    # Predecimos la jugada con Stockfish
+    results_stockfish = analyse_puzzle_from_board_with_Stockfish(
+        board=board,
+        engine=engine_oracle
+    )
+    metrics_puzzle = compute_puzzle_metrics(
+        results_lst=results_LST,
+        results_sf=results_stockfish,
+        correct_move=move
+    )
+    
+    print(metrics_puzzle)
+    
     # Guardamos los resultados
-    puzzles.at[index, 'Played'] = play
-    puzzles.at[index, 'Correct'] = correct
+    results_list.append(metrics_puzzle)
 
-    print({'puzzle_id': index, 'correct': correct, 'play': play, 'solution_UCI': puzzle['Moves_UCI']})
-
-  puzzles.to_csv(output_file, index=False)
-
+  final_results_df = pd.concat(results_list, ignore_index=True)
+  evaluated_puzzles = pd.concat([puzzles, final_results_df], axis=1)
+  #evaluated_puzzles.to_csv(output_file, index=False)
+  evaluated_puzzles.to_csv(output_file, index=False)
 
 if __name__ == '__main__':
   app.run(main)

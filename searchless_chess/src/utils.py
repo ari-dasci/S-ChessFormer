@@ -91,6 +91,12 @@ MOVE_TO_ACTION, ACTION_TO_MOVE = _compute_all_possible_actions()
 NUM_ACTIONS = len(MOVE_TO_ACTION)
 
 
+def centipawns_to_win_probability_tang(centipawns):
+    return 111.714640912*np.tan(1.5620688421*centipawns)
+
+def win_probability_to_centipawns_tang(prob_win):
+    return np.arctan(prob_win / 111.714640912) / 1.5620688421
+
 def centipawns_to_win_probability(centipawns: int) -> float:
   """Returns the win probability (in [0, 1]) converted from the centipawn score.
 
