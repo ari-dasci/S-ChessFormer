@@ -205,12 +205,13 @@ def main(argv: Sequence[str]) -> None:
   
   # Obtenemos el motor de ajedrez a usar como oraculo
   # Por defecto, se usa stockfish con time_limit = 0.05
-  engine_oracle = constants.ENGINE_BUILDERS[_ORACLE.value]()
+  #engine_oracle = constants.ENGINE_BUILDERS[_ORACLE.value]()
   
   # Opcion alternativa: limitar por profundidad
-  #stockfish_depth = 10
+  stockfish_depth = 10
   #limit = chess.engine.Limit(depth=stockfish_depth)
-  #engine_oracle = stock_eng.AllMovesStockfishEngine(limit)
+  limit=chess.engine.Limit(time=1.5)
+  engine_oracle = stock_eng.AllMovesStockfishEngine(limit)
   
   # Añadimos una nueva columna "Played" y otra "Correct" al dataframe
   results_list = []
