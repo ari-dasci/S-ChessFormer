@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=run_puzzles                 # Nombre del proceso
 #SBATCH --partition=dios                    # Cola para ejecutar
-#SBATCH --nodelist=titan,hera                             # Servidor para ejecutar
+#SBATCH --nodelist=titan                             # Servidor para ejecutar
 #SBATCH --gres=gpu:1                         # Número de GPUs a usar
 
 # Verifica que se haya pasado un argumento
