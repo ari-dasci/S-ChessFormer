@@ -110,6 +110,7 @@ def _build_neural_engine(
           params=params,
           batch_size=1,
       ),
+      temperature=0.005,
   )
 
 
