@@ -32,6 +32,8 @@ from searchless_chess.src.engines import lc0_engine
 from searchless_chess.src.engines import neural_engines
 from searchless_chess.src.engines import stockfish_engine
 
+from lichess_bot.homemade import ThinkMore_9M
+
 
 def _build_neural_engine(
     model_name: str,
@@ -110,6 +112,7 @@ def _build_neural_engine(
           params=params,
           batch_size=1,
       ),
+      temperature=0.005,
   )
 
 
@@ -123,6 +126,9 @@ ENGINE_BUILDERS = {
     ),
     '270M': functools.partial(
         _build_neural_engine, model_name='270M', checkpoint_step=6_400_000
+    ),
+    '9M_Depth': functools.partial(
+        ThinkMore_9M,3
     ),
     'stockfish': lambda: stockfish_engine.StockfishEngine(
         limit=chess.engine.Limit(time=0.05)
@@ -138,5 +144,5 @@ ENGINE_BUILDERS = {
     ),
     'leela_chess_zero_400_sims': lambda: lc0_engine.Lc0Engine(
         limit=chess.engine.Limit(nodes=400),
-    ),
+    ), 
 }

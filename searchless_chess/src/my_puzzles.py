@@ -65,6 +65,9 @@ _AGENT = flags.DEFINE_enum(
         '9M',
         '136M',
         '270M',
+        '9M_Depth',
+        '136M_Depth',
+        '270M_Depth',
         'stockfish',
         'stockfish_all_moves',
         'leela_chess_zero_depth_1',
@@ -179,7 +182,7 @@ def compute_puzzle_metrics(
     'CP_LST_move_Stockfish': [results_lst[results_lst['Jugada LST'] == best_move_sf]['CP LST'].values[0]],
     'CP_Stockfish_move_Stockfish': [results_sf[results_sf['Jugada Stockfish'] == best_move_sf]['CP Stockfish'].values[0]]
   })
-
+  print("Puzzle evaluado correctamente")
   return results_df
 
 
