@@ -389,7 +389,7 @@ class ThinkMore_9M(ExampleEngine):
         checkpoint_dir = os.path.join(
 
         os.getcwd(),
-            f'engines/searchless_chess/checkpoints/9M',
+            f'searchless_chess/checkpoints/9M',
         )
         dummy_params = predictor.initial_params(
             rng=jrandom.PRNGKey(6400000),
