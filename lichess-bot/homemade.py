@@ -402,15 +402,17 @@ class ThinkMore_9M(ExampleEngine):
             step=-1,
         )
 
-        predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=1)
+        self.predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=1)
 
         _, self.return_buckets_values = utils.get_uniform_buckets_edges_values(
             num_return_buckets
         )
 
+        self._return_buckets_values = self.return_buckets_values
+
         self.neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
             return_buckets_values=self.return_buckets_values,
-            predict_fn=predict_fn,
+            predict_fn=self.predict_fn,
             temperature=0.005,
         )
 
@@ -508,3 +510,23 @@ class ThinkMore_9M(ExampleEngine):
                     #print(f"Poda: {beta} <= {alpha}")
                     break
             return min_eval
+
+
+    def analyse(self, board: chess.Board) -> engine.AnalysisResult:
+        """Returns buckets log-probs for each action, and FEN."""
+        # Tokenize the legal actions.
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        legal_actions = [utils.MOVE_TO_ACTION[x.uci()] for x in sorted_legal_moves]
+        legal_actions = np.array(legal_actions, dtype=np.int32)
+        legal_actions = np.expand_dims(legal_actions, axis=-1)
+        # Tokenize the return buckets.
+        dummy_return_buckets = np.zeros((len(legal_actions), 1), dtype=np.int32)
+        # Tokenize the board.
+        tokenized_fen = tokenizer.tokenize(board.fen()).astype(np.int32)
+        sequences = np.stack([tokenized_fen] * len(legal_actions))
+        # Create the sequences.
+        sequences = np.concatenate(
+            [sequences, legal_actions, dummy_return_buckets],
+            axis=1,
+        )
+        return {'log_probs': self.predict_fn(sequences)[:, -1], 'fen': board.fen()}
