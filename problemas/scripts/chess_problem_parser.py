@@ -68,7 +68,7 @@ def parse_chess_file(file_path):
     fen_pattern = r"^([\d\w\/]+ [wb] [KQkq\-]+ [\-\w\d]+ \d+ \d+)$"
     
     # Expresión regular para encontrar la primera jugada con "!"
-    move_pattern = r"(\d+\.\s*[\w+#=]+\s*!|\.\.\.[\w+#=]+\s*!)"
+    move_pattern = r"(\d+\.\s*[\w\-+#=]+\s*!|\.\.\.[\w\-+#=]+\s*!)"
     
     # Dividir en líneas y analizar
     lines = content.split("\n")
