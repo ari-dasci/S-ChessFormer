@@ -46,6 +46,7 @@ Alternativamente, si se quiere ejecutar el proceso como un batch en una cola SLU
 
 Si únicamente quieres lanzar un script, por ejemplo, `my_puzzles.py`, debes ejecutar lo siguiente desde el directorio raiz del proyecto:
 
-```python3 searchless_chess/src/my_puzzles.py --agent <nombre_agente> --input_file problemas/unsolved_puzzles/<archivo_csv> --output_file problemas/solved_puzzles/<archivo_csv>
+```
+python3 searchless_chess/src/my_puzzles.py --agent <nombre_agente> --input_file problemas/unsolved_puzzles/<archivo_csv> --output_file problemas/solved_puzzles/<archivo_csv>
 
 ```
