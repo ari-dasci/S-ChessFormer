@@ -32,7 +32,7 @@ from searchless_chess.src.engines import lc0_engine
 from searchless_chess.src.engines import neural_engines
 from searchless_chess.src.engines import stockfish_engine
 
-#from lichess_bot.homemade import ThinkMore_9M
+from lichess_bot.homemade import ThinkMore_9M
 
 
 def _build_neural_engine(
