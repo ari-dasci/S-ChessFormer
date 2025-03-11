@@ -128,7 +128,7 @@ ENGINE_BUILDERS = {
         _build_neural_engine, model_name='270M', checkpoint_step=6_400_000
     ),
     '9M_Depth': functools.partial(
-        ThinkMore_9M,None,None,None,None
+        ThinkMore_9M,3
     ),
     'stockfish': lambda: stockfish_engine.StockfishEngine(
         limit=chess.engine.Limit(time=0.05)
