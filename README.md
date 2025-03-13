@@ -1,5 +1,5 @@
 # S-ChessFormer
-Repositorio sobre ajedrez, transformers y razonamiento vs memorización. TFM de Jorge Remacho y Álvaro Rodríguez
+Repositorio sobre ajedrez, transformers y razonamiento vs memorización. TFM de Jorge López Remacho y Álvaro Rodríguez Gallardo.
 
 ## Ejecución
 
@@ -49,4 +49,14 @@ Si únicamente quieres lanzar un script, por ejemplo, `my_puzzles.py`, debes eje
 ```
 python3 searchless_chess/src/my_puzzles.py --agent <nombre_agente> --input_file problemas/unsolved_puzzles/<archivo_csv> --output_file problemas/solved_puzzles/<archivo_csv>
 
+```
+Recuerda instalar Stockfish para poder utilizar el script `my_puzzles`. Esto se puede conseguir con las siguientes instrucciones:
+
+
+```
+cd searchless_chess
+git clone https://github.com/official-stockfish/Stockfish.git
+cd Stockfish/src
+make -j profile-build ARCH=x86-64-avx2
+cd ../../..
 ```
