@@ -132,6 +132,12 @@ def analyse_puzzle_from_board_with_Stockfish(
   
   return dict_results
 
+def get_engine(agent: str, limit: chess.engine.Limit = None) -> engine_lib.Engine:
+    """Returns the engine instance based on the agent and limit."""
+    if agent in ['stockfish', 'stockfish_all_moves']:
+        return constants.ENGINE_BUILDERS[agent](limit=limit)
+    else:
+        return constants.ENGINE_BUILDERS[agent]()
 
 def main(argv: Sequence[str]) -> None:
   
@@ -150,14 +156,16 @@ def main(argv: Sequence[str]) -> None:
     puzzles = pd.read_csv(puzzles_file, nrows=_NUM_PUZZLES.value)
     
   # Obtenemos el motor de ajedrez a analizar
-  if _AGENT.value == 'stockfish' or _AGENT.value == 'stockfish_all_moves':
-    if _DEPTH.value != None:
+  if _AGENT.value in ['stockfish', 'stockfish_all_moves']:
+    if _DEPTH.value is not None:
       limit = chess.engine.Limit(depth=_DEPTH.value)
-    elif _TIME.value != None:
+    elif _TIME.value is not None:
       limit = chess.engine.Limit(time=_TIME.value)
-    engine = constants.ENGINE_BUILDERS[_AGENT.value](limit=limit)
+    else:
+      limit = chess.engine.Limit(time=0.05)
+    engine = get_engine(_AGENT.value, limit=limit)
   else:
-    engine = constants.ENGINE_BUILDERS[_AGENT.value]()
+    engine = get_engine(_AGENT.value)
   
   # Analizamos todos los puzzles
   results_list = []
@@ -167,7 +175,7 @@ def main(argv: Sequence[str]) -> None:
     move = puzzle['Moves_UCI']
     
     # Predecimos las jugadas
-    if(_AGENT.value == 'stockfish'):
+    if _AGENT.value in ['stockfish', 'stockfish_all_moves']:
       results = analyse_puzzle_from_board_with_Stockfish(
           board=board,
           engine=engine
@@ -180,8 +188,14 @@ def main(argv: Sequence[str]) -> None:
       
     # Guardamos los resultados
     results_list.append(results)
-
+  
   column_name = _AGENT.value + '_results'
+  if _AGENT.value in ['stockfish', 'stockfish_all_moves']:
+    if _DEPTH.value is not None:
+      column_name += '_' + str(_DEPTH.value) + 'depth'
+    elif _TIME.value is not None:
+      column_name += '_' + str(_TIME.value) + 'time'
+      
   final_results_df = pd.DataFrame({column_name: results_list})
   evaluated_puzzles = pd.concat([puzzles, final_results_df], axis=1)
   evaluated_puzzles.to_csv(output_file, index=False)
