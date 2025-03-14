@@ -31,7 +31,7 @@ from searchless_chess.src.engines import constants
 from searchless_chess.src.engines import engine as engine_lib
 
 import engines.stockfish_engine as stock_eng
-
+import json
 import numpy as np
 from utils import centipawns_to_win_probability, win_probability_to_centipawns
 
@@ -78,59 +78,44 @@ _AGENT = flags.DEFINE_enum(
     required=False,
 )
 
-_ORACLE = flags.DEFINE_enum(
-    name='oracle',
-    default='stockfish_all_moves',
-    enum_values=[
-        'local',
-        '9M',
-        '136M',
-        '270M',
-        'stockfish',
-        'stockfish_all_moves',
-        'leela_chess_zero_depth_1',
-        'leela_chess_zero_policy_net',
-        'leela_chess_zero_400_sims',
-    ],
-    help='The oracle to use to grant the solution and give metrics.',
-    required=False,
+_DEPTH = flags.DEFINE_integer(
+    name='depth',
+    default=None,
+    help='The depth to use for the engine (only used by Stockfish).',
+)
+
+_TIME = flags.DEFINE_integer(
+    name='time',
+    default=None,
+    help='The time the engine uses to analyse each move (only used by Stockfish).',
 )
 
 
 def analyse_puzzle_from_board_with_LST(
     board: chess.Board,
     engine: engine_lib.Engine
-) -> pd.DataFrame:
+) -> dict:
   """Returns the evaluation of all posible moves by LST (or a neural model), ordered by CP."""
   
   # Obtenemos la jugada del motor a evaluar (LST)
   buckets_log_probs = engine.analyse(board)['log_probs']
   win_probs = np.inner(np.exp(buckets_log_probs), engine._return_buckets_values)
   sorted_legal_moves = engine_lib.get_ordered_legal_moves(board)
-  """
-  print('Jugadas:', sorted_legal_moves)
-  print('Probabilidades:', win_probs)
   
-  for i in np.argsort(win_probs)[::-1]:
-    print(i)
-    cp = win_probability_to_centipawns(win_probs[i])
-    print(f'  {sorted_legal_moves[i].uci()} -> {100*win_probs[i]:.1f}% cp: {cp}')
-  """
-  df_results = pd.DataFrame({
-    'Jugada LST': [move.uci() for move in sorted_legal_moves],
-    '%win LST': win_probs,
-    'CP LST': [win_probability_to_centipawns(p) for p in win_probs]
-  })
+  dict_results = {
+    move.uci(): {
+      'wp': wp, 
+      'cp': win_probability_to_centipawns(wp)
+    } for move, wp in zip(sorted_legal_moves, win_probs)
+  }
   
-  df_results = df_results.sort_values(by='%win LST', ascending=False).reset_index(drop=True)
-  
-  return df_results
+  return dict_results
 
 
 def analyse_puzzle_from_board_with_Stockfish(
     board: chess.Board,
     engine: engine_lib.Engine
-) -> pd.DataFrame:
+) -> dict:
   """Returns the evaluation of all posible moves by Stockfish, ordered by CP."""
   
   # Obtenemos las valoraciones de Stockfish
@@ -138,53 +123,14 @@ def analyse_puzzle_from_board_with_Stockfish(
   moves = [move.uci() for move, _ in analysis_results_1]
   moves_cp = [eval_.score(mate_score=3000) for _, eval_ in analysis_results_1] # Un mate se penaliza con 3000 CP
   
-  results_df = pd.DataFrame({
-    'Jugada Stockfish': moves,
-    '%win Stockfish': [centipawns_to_win_probability(cp) for cp in moves_cp],  
-    'CP Stockfish': moves_cp
-  })
+  dict_results = {
+    move: {
+      'wp': centipawns_to_win_probability(cp), 
+      'cp': cp
+    } for move, cp in zip(moves, moves_cp)
+  }
   
-  # Ordenamos las jugadas de mejor a peor
-  results_df = results_df.sort_values(by='CP Stockfish', ascending=False).reset_index(drop=True)
-  
-  return results_df
-
-def compute_puzzle_metrics(
-  results_lst: pd.DataFrame,
-  results_sf: pd.DataFrame,
-  correct_move: str
-) -> pd.DataFrame:
-  """Returns the metrics of the puzzle."""
-  
-  # Obtenemos la mejor jugada de cada modelo
-  best_move_lst = results_lst.iloc[0]['Jugada LST']
-  best_move_sf = results_sf.iloc[0]['Jugada Stockfish']
-  print(correct_move, best_move_lst, best_move_sf)
-  # Devolvemos ambas en un dataframe
-  results_df = pd.DataFrame({
-    # Métricas para el mejor movimiento
-    '%win_LST_best_move': [results_lst[results_lst['Jugada LST'] == correct_move]['%win LST'].values[0]],
-    '%win_Stockfish_best_move': [results_sf[results_sf['Jugada Stockfish'] == correct_move]['%win Stockfish'].values[0]],
-    'CP_LST_best_move': [results_lst[results_lst['Jugada LST'] == correct_move]['CP LST'].values[0]],
-    'CP_Stockfish_best_move': [results_sf[results_sf['Jugada Stockfish'] == correct_move]['CP Stockfish'].values[0]],
-    # Métricas para el movimiento de LST 
-    'move_LST': [best_move_lst], 
-    'correct_LST': [best_move_lst == correct_move],
-    '%win_LST_move_LST': [results_lst[results_lst['Jugada LST'] == best_move_lst]['%win LST'].values[0]],
-    '%win_Stockfish_move_LST': [results_sf[results_sf['Jugada Stockfish'] == best_move_lst]['%win Stockfish'].values[0]],
-    'CP_LST_move_LST': [results_lst[results_lst['Jugada LST'] == best_move_lst]['CP LST'].values[0]],
-    'CP_Stockfish_move_LST': [results_sf[results_sf['Jugada Stockfish'] == best_move_lst]['CP Stockfish'].values[0]],
-    # Métricas para el movimiento de Stockfish
-    'move_Stockfish': [best_move_sf],
-    'correct_Stockfish': [best_move_sf == correct_move],
-    '%win_LST_move_Stockfish': [results_lst[results_lst['Jugada LST'] == best_move_sf]['%win LST'].values[0]],
-    '%win_Stockfish_move_Stockfish': [results_sf[results_sf['Jugada Stockfish'] == best_move_sf]['%win Stockfish'].values[0]],
-    'CP_LST_move_Stockfish': [results_lst[results_lst['Jugada LST'] == best_move_sf]['CP LST'].values[0]],
-    'CP_Stockfish_move_Stockfish': [results_sf[results_sf['Jugada Stockfish'] == best_move_sf]['CP Stockfish'].values[0]]
-  })
-  print("Puzzle evaluado correctamente")
-  return results_df
-
+  return dict_results
 
 
 def main(argv: Sequence[str]) -> None:
@@ -204,49 +150,40 @@ def main(argv: Sequence[str]) -> None:
     puzzles = pd.read_csv(puzzles_file, nrows=_NUM_PUZZLES.value)
     
   # Obtenemos el motor de ajedrez a analizar
-  engine_lst = constants.ENGINE_BUILDERS[_AGENT.value]()
-  
-  # Obtenemos el motor de ajedrez a usar como oraculo
-  # Por defecto, se usa stockfish con time_limit = 0.05
-  #engine_oracle = constants.ENGINE_BUILDERS[_ORACLE.value]()
-  
-  # Opcion alternativa: limitar por profundidad
-  stockfish_depth = 10
-  #limit = chess.engine.Limit(depth=stockfish_depth)
-  limit=chess.engine.Limit(time=1.5)
-  engine_oracle = stock_eng.AllMovesStockfishEngine(limit)
-  
-  # Añadimos una nueva columna "Played" y otra "Correct" al dataframe
-  results_list = []
+  if _AGENT.value == 'stockfish' or _AGENT.value == 'stockfish_all_moves':
+    if _DEPTH.value != None:
+      limit = chess.engine.Limit(depth=_DEPTH.value)
+    elif _TIME.value != None:
+      limit = chess.engine.Limit(time=_TIME.value)
+    engine = constants.ENGINE_BUILDERS[_AGENT.value](limit=limit)
+  else:
+    engine = constants.ENGINE_BUILDERS[_AGENT.value]()
   
   # Analizamos todos los puzzles
-  for _, puzzle in puzzles.iterrows():
+  results_list = []
+  
+  for i, puzzle in puzzles.iterrows():
     board = chess.Board(puzzle['FEN'])
     move = puzzle['Moves_UCI']
-    # Predecimos la jugada con LST
-    results_LST = analyse_puzzle_from_board_with_LST(
-        board=board,
-        engine=engine_lst
-    )
-    # Predecimos la jugada con Stockfish
-    results_stockfish = analyse_puzzle_from_board_with_Stockfish(
-        board=board,
-        engine=engine_oracle
-    )
-    metrics_puzzle = compute_puzzle_metrics(
-        results_lst=results_LST,
-        results_sf=results_stockfish,
-        correct_move=move
-    )
     
-    print(metrics_puzzle)
-    
+    # Predecimos las jugadas
+    if(_AGENT.value == 'stockfish'):
+      results = analyse_puzzle_from_board_with_Stockfish(
+          board=board,
+          engine=engine
+      )
+    else:
+      results = analyse_puzzle_from_board_with_LST(
+          board=board,
+          engine=engine
+      )
+      
     # Guardamos los resultados
-    results_list.append(metrics_puzzle)
+    results_list.append(results)
 
-  final_results_df = pd.concat(results_list, ignore_index=True)
+  column_name = _AGENT.value + '_results'
+  final_results_df = pd.DataFrame({column_name: results_list})
   evaluated_puzzles = pd.concat([puzzles, final_results_df], axis=1)
-  #evaluated_puzzles.to_csv(output_file, index=False)
   evaluated_puzzles.to_csv(output_file, index=False)
 
 if __name__ == '__main__':

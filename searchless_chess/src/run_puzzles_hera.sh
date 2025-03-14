@@ -52,6 +52,7 @@ pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-re
 
 # Exporta la variable de entorno PYTHONPATH
 export PYTHONPATH="/mnt/homeGPU/jorgelerre/S-ChessFormer/:$PYTHONPATH"
+export PYTHONPATH="/mnt/homeGPU/jorgelerre/S-ChessFormer/lichess_bot:$PYTHONPATH"
 
 # Ejecuta el script principal con el nombre del motor pasado como argumento
 python3 my_puzzles.py --agent "$ENGINE_NAME" --input_file "$INPUT_FILE" --output_file "$OUTPUT_FILE" 
