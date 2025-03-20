@@ -254,26 +254,41 @@ def transformer_decoder(
     targets: The integer target values, shape [B, T].
     config: The config to use for the transformer.
   """
+  #print('Init transformer decoder')
+  #print('targets:', targets.shape)
   # Right shift the targets to get the inputs (the first token is now a 0).
   inputs = shift_right(targets)
+  #print('inputs:', inputs.shape)
 
   # Embeds the inputs and adds positional encodings.
   embeddings = embed_sequences(inputs, config)
+  #print('embeddings:', embeddings.shape)
 
   h = embeddings
   for _ in range(config.num_layers):
     attention_input = layer_norm(h)
+    #print('attention_input:', attention_input.shape)
     attention = _attention_block(attention_input, config)
+    #print('attention:', attention.shape)
     h += attention
+    #print('h:', h.shape)
 
     mlp_input = layer_norm(h)
+    #print('mlp_input:', mlp_input.shape)
     mlp_output = _mlp_block(mlp_input, config)
+    #print('mlp_output:', mlp_output.shape)
     h += mlp_output
+    #print('h:', h.shape)
 
   if config.apply_post_ln:
     h = layer_norm(h)
+    #print('h post ln:', h.shape)
   logits = hk.Linear(config.output_size)(h)
-  return jnn.log_softmax(logits, axis=-1)
+  #print('logits:', logits.shape)
+  #print('End transformer decoder')
+  softmax = jnn.log_softmax(logits, axis=-1)
+  #print('softmax:', softmax.shape)
+  return softmax
 
 
 def build_transformer_predictor(
