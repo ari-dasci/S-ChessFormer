@@ -115,7 +115,6 @@ def _build_neural_engine(
       temperature=0.005,
   )
 
-
 ENGINE_BUILDERS = {
     'local': functools.partial(_build_neural_engine, model_name='local'),
     '9M': functools.partial(
@@ -128,21 +127,21 @@ ENGINE_BUILDERS = {
         _build_neural_engine, model_name='270M', checkpoint_step=6_400_000
     ),
     '9M_Depth': functools.partial(
-        ThinkMore_9M,3
+        ThinkMore_9M, 3
     ),
-    'stockfish': lambda: stockfish_engine.StockfishEngine(
-        limit=chess.engine.Limit(time=0.05)
+    'stockfish': lambda limit=None: stockfish_engine.StockfishEngine(
+        limit=limit if limit else chess.engine.Limit(time=0.05)
     ),
-    'stockfish_all_moves': lambda: stockfish_engine.AllMovesStockfishEngine(
-        limit=chess.engine.Limit(time=0.05)
+    'stockfish_all_moves': lambda limit=None: stockfish_engine.AllMovesStockfishEngine(
+        limit=limit if limit else chess.engine.Limit(time=0.05)
     ),
-    'leela_chess_zero_depth_1': lambda: lc0_engine.AllMovesLc0Engine(
-        limit=chess.engine.Limit(nodes=1),
+    'leela_chess_zero_depth_1': lambda limit=None: lc0_engine.AllMovesLc0Engine(
+        limit=limit if limit else chess.engine.Limit(nodes=1),
     ),
-    'leela_chess_zero_policy_net': lambda: lc0_engine.Lc0Engine(
-        limit=chess.engine.Limit(nodes=1),
+    'leela_chess_zero_policy_net': lambda limit=None: lc0_engine.Lc0Engine(
+        limit=limit if limit else chess.engine.Limit(nodes=1),
     ),
-    'leela_chess_zero_400_sims': lambda: lc0_engine.Lc0Engine(
-        limit=chess.engine.Limit(nodes=400),
+    'leela_chess_zero_400_sims': lambda limit=None: lc0_engine.Lc0Engine(
+        limit=limit if limit else chess.engine.Limit(nodes=400),
     ), 
 }

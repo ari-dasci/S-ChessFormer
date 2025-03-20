@@ -46,6 +46,8 @@ class DataConfig:
   # The number of records to read from the dataset (can be useful when, e.g.,
   # the dataset does not fit into memory).
   num_records: int | None = None
+  # The path of the file containing the data
+  data_path: str | None = None
 
 
 @dataclasses.dataclass(kw_only=True)

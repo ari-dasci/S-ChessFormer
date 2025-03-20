@@ -74,25 +74,41 @@ class ActionValueEngine(NeuralEngine):
     """Returns buckets log-probs for each action, and FEN."""
     # Tokenize the legal actions.
     sorted_legal_moves = engine.get_ordered_legal_moves(board)
+    #print('sorted_legal_moves:', sorted_legal_moves)
     legal_actions = [utils.MOVE_TO_ACTION[x.uci()] for x in sorted_legal_moves]
+    #print('legal_actions 1:', legal_actions)
     legal_actions = np.array(legal_actions, dtype=np.int32)
+    #print('legal_actions 2:', legal_actions)
     legal_actions = np.expand_dims(legal_actions, axis=-1)
+    #print('legal_actions 3:', legal_actions)
+    #print('legal_actions.shape:', legal_actions.shape)
     # Tokenize the return buckets.
     dummy_return_buckets = np.zeros((len(legal_actions), 1), dtype=np.int32)
+    #print('dummy_return_buckets:', dummy_return_buckets)
+    #print('dummy_return_buckets.shape:', dummy_return_buckets.shape)
     # Tokenize the board.
     tokenized_fen = tokenizer.tokenize(board.fen()).astype(np.int32)
+    #print('tokenized_fen:', tokenized_fen)
+    #print('tokenized_fen.shape:', tokenized_fen.shape)
     sequences = np.stack([tokenized_fen] * len(legal_actions))
+    #print('sequences:', sequences)
+    #print('sequences.shape:', sequences.shape)
     # Create the sequences.
     sequences = np.concatenate(
         [sequences, legal_actions, dummy_return_buckets],
         axis=1,
     )
-    return {'log_probs': self.predict_fn(sequences)[:, -1], 'fen': board.fen()}
+    #print('sequences:', sequences)
+    
+    result = {'log_probs': self.predict_fn(sequences)[:, -1], 'fen': board.fen()}
+    #print('result:', result)
+    return result
 
   def play(self, board: chess.Board) -> chess.Move:
     return_buckets_log_probs = self.analyse(board)['log_probs']
     return_buckets_probs = np.exp(return_buckets_log_probs)
     win_probs = np.inner(return_buckets_probs, self._return_buckets_values)
+    #print('win_probs:', win_probs.shape)
     _update_scores_with_repetitions(board, win_probs)
     sorted_legal_moves = engine.get_ordered_legal_moves(board)
     if self.temperature is not None:

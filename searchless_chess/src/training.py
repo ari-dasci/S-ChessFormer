@@ -89,7 +89,7 @@ def train(
   opt_state = training_utils.replicate(opt_state, sharding)
 
   latest_step = 0
-
+    
   # Initialize the checkpointer and restore any previous checkpoints.
   if train_config.ckpt_frequency is not None:
     logging.info('Initializing the checkpoint manager.')

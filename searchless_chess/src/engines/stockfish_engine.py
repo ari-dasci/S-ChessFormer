@@ -31,9 +31,10 @@ class StockfishEngine(engine.Engine):
   ) -> None:
     self._limit = limit
     self._skill_level = None
+    
     bin_path = os.path.join(
-        os.getcwd(),
-        'searchless_chess/Stockfish/src/stockfish',
+        os.path.dirname(os.path.abspath(__file__)),
+        '../../Stockfish/src/stockfish'
     )
     self._raw_engine = chess.engine.SimpleEngine.popen_uci(bin_path)
 
