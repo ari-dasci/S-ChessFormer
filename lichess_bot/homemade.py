@@ -416,12 +416,12 @@ class ThinkMore_9M(ExampleEngine):
             temperature=0.005,
         )
 
-    def search(self,
-               board: chess.Board,
-               time_limit: Limit,
-               ponder: bool,  # noqa: ARG002
-               draw_offered: bool,
-               root_moves: MOVE):
+    def analyse(self,
+               board: chess.Board):
+              # time_limit: Limit,
+              # ponder: bool,  # noqa: ARG002
+              # draw_offered: bool,
+              # root_moves: MOVE):
 
             top_move = None
             depth = self.move
@@ -457,7 +457,7 @@ class ThinkMore_9M(ExampleEngine):
             return PlayResult(top_move, None)
 
     def evaluate_actions(self, board):
-        results = self.neural_engine.analyse(board)
+        results = self.analyse_without_depth(board)
         buckets_log_probs = results['log_probs']
 
         # Compute the expected return.
@@ -512,7 +512,7 @@ class ThinkMore_9M(ExampleEngine):
             return min_eval
 
 
-    def analyse(self, board: chess.Board) -> engine.AnalysisResult:
+    def analyse_without_depth(self, board: chess.Board) -> engine.AnalysisResult:
         """Returns buckets log-probs for each action, and FEN."""
         # Tokenize the legal actions.
         sorted_legal_moves = engine.get_ordered_legal_moves(board)
