@@ -424,7 +424,9 @@ class ThinkMore_9M(ExampleEngine):
               # root_moves: MOVE):
 
             top_move = None
-            depth = self.move
+            depth = self.depth
+            evals = []
+
             # Opposite of our minimax
             if board.turn == chess.WHITE:
                 top_eval = -np.inf
@@ -441,7 +443,7 @@ class ThinkMore_9M(ExampleEngine):
                 eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
 
                 board.pop()
-
+                evals.append(eval)
                 if board.turn == chess.WHITE:
                     if eval > top_eval:
                         top_move = move
@@ -454,7 +456,7 @@ class ThinkMore_9M(ExampleEngine):
             #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
 
             # Devolvemos la jugada
-            return PlayResult(top_move, None)
+            return {'top_move':PlayResult(top_move, None),'log_probs':evals}
 
     def evaluate_actions(self, board):
         results = self.analyse_without_depth(board)
@@ -477,6 +479,31 @@ class ThinkMore_9M(ExampleEngine):
     def minimax(self, board, depth, alpha, beta, maximizing_player):
         #print("DEPTH: ", depth)
         if depth == 0 or board.is_game_over():
+            # Si es game over puede pasar:
+            # - mate: si lo doy yo, 1 si soy blancas (resp. -1 si soy negras), y -1 si me lo da el oponente (resp. ...)
+            # - tablas: 0.5---> hay empate
+            #  ---> Conviene usar 'outcome' de Chess, que da lo que ocurre en el tablero
+            if len(list(board.legal_moves)) == 0:  # No hay jugadas legales: puede ser jaque mate o tablas
+                situation = board.outcome()
+                
+                if situation is not None:
+                    who_wins = situation.winner
+
+                    if situation.termination == chess.Termination.CHECKMATE:
+                        # Si el bot tenía el turno (depth par), y hay jaque mate → el bot perdió
+                        # Si el oponente tenía el turno (depth impar), y hay jaque mate → el bot ganó
+                        if self.depth % 2 == 0:
+                            return -1.0  # el bot ha perdido
+                        else:
+                            return 1.0   # el bot ha ganado
+
+                    if who_wins is None:
+                        # Hay tablas: ahogado, repetición, material insuficiente, etc.
+                        return 0.5
+                else:
+                    print("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
+
+            
             win_probs, _ = self.evaluate_actions(board)
             if maximizing_player:
                 best_win_prob = min(win_probs)
