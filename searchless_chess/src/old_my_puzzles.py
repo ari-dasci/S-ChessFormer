@@ -99,19 +99,19 @@ _ORACLE = flags.DEFINE_enum(
 
 def analyse_puzzle_from_board_with_LST(
     board: chess.Board,
-    engine: engine_lib.Engine
+    engine: engine_lib.Engine,
+    search: bool = False
 ) -> pd.DataFrame:
   """Returns the evaluation of all posible moves by LST (or a neural model), ordered by CP."""
   
   # Obtenemos la jugada del motor a evaluar (LST). ESTO PARA MODELOS SIN PROFUNDIDAD
-  #buckets_log_probs = engine.analyse(board)['log_probs']
-  #win_probs = np.inner(np.exp(buckets_log_probs), engine._return_buckets_values)
-  #sorted_legal_moves = engine_lib.get_ordered_legal_moves(board)
-
-  # ESTO PARA MODELOS CON PROFUNDIDAD
-  win_probs = engine.analyse(board)['log_probs']
-  legal_moves = board.legal_moves
-
+  if not search:
+    buckets_log_probs = engine.analyse(board)['log_probs']
+    win_probs = np.inner(np.exp(buckets_log_probs), engine._return_buckets_values)
+  else:
+    win_probs = engine.analyse(board)['probs']
+  sorted_legal_moves = engine_lib.get_ordered_legal_moves(board)
+  
   """
   print('Jugadas:', sorted_legal_moves)
   print('Probabilidades:', win_probs)
@@ -121,8 +121,9 @@ def analyse_puzzle_from_board_with_LST(
     cp = win_probability_to_centipawns(win_probs[i])
     print(f'  {sorted_legal_moves[i].uci()} -> {100*win_probs[i]:.1f}% cp: {cp}')
   """
+  
   df_results = pd.DataFrame({
-    'Jugada LST': [move.uci() for move in legal_moves],
+    'Jugada LST': [move.uci() for move in sorted_legal_moves],
     '%win LST': win_probs,
     'CP LST': [win_probability_to_centipawns(p) for p in win_probs]
   })
@@ -215,7 +216,7 @@ def main(argv: Sequence[str]) -> None:
   #engine_oracle = constants.ENGINE_BUILDERS[_ORACLE.value]()
   
   # Opcion alternativa: limitar por profundidad
-  stockfish_depth = 10
+  #stockfish_depth = 10
   #limit = chess.engine.Limit(depth=stockfish_depth)
   limit=chess.engine.Limit(time=1.5)
   engine_oracle = stock_eng.AllMovesStockfishEngine(limit)
@@ -230,7 +231,8 @@ def main(argv: Sequence[str]) -> None:
     # Predecimos la jugada con LST
     results_LST = analyse_puzzle_from_board_with_LST(
         board=board,
-        engine=engine_lst
+        engine=engine_lst,
+        search='Depth' in _AGENT.value
     )
     # Predecimos la jugada con Stockfish
     results_stockfish = analyse_puzzle_from_board_with_Stockfish(

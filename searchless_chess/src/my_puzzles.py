@@ -26,7 +26,7 @@ import chess
 import chess.engine
 import chess.pgn
 import pandas as pd
-
+import logging
 from searchless_chess.src.engines import constants
 from searchless_chess.src.engines import engine as engine_lib
 
@@ -93,15 +93,21 @@ _TIME = flags.DEFINE_integer(
 
 def analyse_puzzle_from_board_with_LST(
     board: chess.Board,
-    engine: engine_lib.Engine
+    engine: engine_lib.Engine,
+    search: bool = False
 ) -> dict:
   """Returns the evaluation of all posible moves by LST (or a neural model), ordered by CP."""
   
-  # Obtenemos la jugada del motor a evaluar (LST)
-  buckets_log_probs = engine.analyse(board)['log_probs']
-  win_probs = np.inner(np.exp(buckets_log_probs), engine._return_buckets_values)
+  # Obtenemos las valoraciones del motor a evaluar (LST)
+  if search:
+    win_probs = engine.analyse(board)['probs']
+  else:
+    buckets_log_probs = engine.analyse(board)['log_probs']
+    win_probs = np.inner(np.exp(buckets_log_probs), engine._return_buckets_values)
+  
   sorted_legal_moves = engine_lib.get_ordered_legal_moves(board)
   
+  # Guardamos los resultados en un diccionario
   dict_results = {
     move.uci(): {
       'wp': wp, 
@@ -119,7 +125,10 @@ def analyse_puzzle_from_board_with_Stockfish(
   """Returns the evaluation of all posible moves by Stockfish, ordered by CP."""
   
   # Obtenemos las valoraciones de Stockfish
-  analysis_results_1 = engine.analyse(board)['scores']
+  
+  analysis_results_1 = engine.analyse(board)
+  logging.info(f"Analysis results: {analysis_results_1}")
+  analysis_results_1 = analysis_results_1['scores']
   moves = [move.uci() for move, _ in analysis_results_1]
   moves_cp = [eval_.score(mate_score=3000) for _, eval_ in analysis_results_1] # Un mate se penaliza con 3000 CP
   
@@ -172,8 +181,7 @@ def main(argv: Sequence[str]) -> None:
   
   for i, puzzle in puzzles.iterrows():
     board = chess.Board(puzzle['FEN'])
-    move = puzzle['Moves_UCI']
-    
+    logging.info(f"Analysing puzzle {i+1}")
     # Predecimos las jugadas
     if _AGENT.value in ['stockfish', 'stockfish_all_moves']:
       results = analyse_puzzle_from_board_with_Stockfish(
@@ -183,9 +191,10 @@ def main(argv: Sequence[str]) -> None:
     else:
       results = analyse_puzzle_from_board_with_LST(
           board=board,
-          engine=engine
+          engine=engine,
+          search='Depth' in _AGENT.value
       )
-      
+    logging.info(f"Results puzzle {i+1}: {results}")
     # Guardamos los resultados
     results_list.append(results)
   

@@ -402,7 +402,7 @@ class ThinkMore_9M(ExampleEngine):
             step=-1,
         )
 
-        self.predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=1)
+        self.predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=32)
 
         _, self.return_buckets_values = utils.get_uniform_buckets_edges_values(
             num_return_buckets
@@ -433,105 +433,108 @@ class ThinkMore_9M(ExampleEngine):
             else:
                 top_eval = np.inf
             #print('--------------INIT MINIMAX--------------')
+            logging.info(f"INIT MINIMAX with depth: {depth}")
             for move in board.legal_moves:
                 board.push(move)
 
-                #print("EVALUATING MOVE: ", move)
+                logging.info(f"EVALUATING MOVE: {move}")
 
                 # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
                 #print("Turno:", board.turn)
                 eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
 
+                logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
                 board.pop()
+                
+                # Si el bot juega con piezas negras, invertimos las probabilidades
+                if board.turn == chess.BLACK:
+                    eval = 1 - eval
+                    
                 evals.append(eval)
-                if board.turn == chess.WHITE:
-                    if eval > top_eval:
-                        top_move = move
-                        top_eval = eval
-                else:
-                    if eval < top_eval:
-                        top_move = move
-                        top_eval = eval
+                
+                # Nos quedamos con la mejor jugada para el jugador actual
+                if eval > top_eval:
+                    top_move = move
+                    top_eval = eval
+                
 
             #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
 
             # Devolvemos la jugada
-            return {'top_move':PlayResult(top_move, None),'log_probs':evals}
+            return {'top_move':PlayResult(top_move, None),'probs':evals}
 
-    def evaluate_actions(self, board):
+    def evaluate_actions(self, board, maximizing_player):
         results = self.analyse_without_depth(board)
         buckets_log_probs = results['log_probs']
 
-        # Compute the expected return.
+        # Compute the expected return
         win_probs = np.inner(np.exp(buckets_log_probs), self.return_buckets_values)
+        # Si el bot juega con piezas negras, invertimos las probabilidades
+        if not maximizing_player:
+            win_probs = -win_probs + 1
+            
         sorted_legal_moves = engine.get_ordered_legal_moves(board)
         #print('WIN PROBS: ', win_probs)
         #print('SORTED LEGAL MOVES: ', sorted_legal_moves)
 
-        for i in np.argsort(win_probs)[:-3:-1]:
-            print(i)
-            cp = win_probability_to_centipawns(win_probs[i])
-            print(f'  {sorted_legal_moves[i].uci()} -> {100*win_probs[i]:.1f}% cp: {cp}')
-
         return win_probs, sorted_legal_moves
 
 
-    def minimax(self, board, depth, alpha, beta, maximizing_player):
+    def minimax(self, board : chess.Board, depth, alpha, beta, maximizing_player):
         #print("DEPTH: ", depth)
         if depth == 0 or board.is_game_over():
             # Si es game over puede pasar:
             # - mate: si lo doy yo, 1 si soy blancas (resp. -1 si soy negras), y -1 si me lo da el oponente (resp. ...)
             # - tablas: 0.5---> hay empate
             #  ---> Conviene usar 'outcome' de Chess, que da lo que ocurre en el tablero
-            if len(list(board.legal_moves)) == 0:  # No hay jugadas legales: puede ser jaque mate o tablas
+            
+            if len(engine.get_ordered_legal_moves(board)) == 0:  # No hay jugadas legales: puede ser jaque mate o tablas
                 situation = board.outcome()
                 
                 if situation is not None:
                     who_wins = situation.winner
-
-                    if situation.termination == chess.Termination.CHECKMATE:
-                        # Si el bot tenía el turno (depth par), y hay jaque mate → el bot perdió
-                        # Si el oponente tenía el turno (depth impar), y hay jaque mate → el bot ganó
-                        if self.depth % 2 == 0:
-                            return -1.0  # el bot ha perdido
-                        else:
-                            return 1.0   # el bot ha ganado
-
                     if who_wins is None:
                         # Hay tablas: ahogado, repetición, material insuficiente, etc.
                         return 0.5
+                    elif situation.termination == chess.Termination.CHECKMATE:
+                        return 0.0  # el jugador actual ha perdido
                 else:
-                    print("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
+                    logging.warning("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
+                    exit()
 
-            
-            win_probs, _ = self.evaluate_actions(board)
+            win_probs, _ = self.evaluate_actions(board, maximizing_player)
             if maximizing_player:
-                best_win_prob = min(win_probs)
-            else:
                 best_win_prob = max(win_probs)
+            else:
+                best_win_prob = min(win_probs)
             #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
             return best_win_prob
-
+        
+        logging.info(f"MINIMAX AT DEPTH: {depth}")
         if maximizing_player:
+            logging.info(f"WHITE PLAYER")
             max_eval = -np.inf
-            for move in board.legal_moves:
+            for move in engine.get_ordered_legal_moves(board):
                 #print("EVALUATING MOVE: ", move)
                 board.push(move)
                 eval = self.minimax(board, depth - 1, alpha, beta, False)
                 board.pop()
                 max_eval = max(max_eval, eval)
+                logging.info(f"NEW EVAL: {eval} \t\t MAX EVAL: {max_eval}")
                 alpha = max(alpha, eval)
                 if beta <= alpha:
                     #print(f"Poda: {beta} <= {alpha}")
                     break
             return max_eval
         else:
+            logging.info(f"BLACK PLAYER")
             min_eval = np.inf
-            for move in board.legal_moves:
+            for move in engine.get_ordered_legal_moves(board):
                 board.push(move)
                 eval = self.minimax(board, depth - 1, alpha, beta, True)
                 board.pop()
                 min_eval = min(min_eval, eval)
+                logging.info(f"NEW EVAL: {eval} \t\t MIN EVAL: {min_eval}")
                 beta = min(beta, eval)
                 if beta <= alpha:
                     #print(f"Poda: {beta} <= {alpha}")
