@@ -57,7 +57,7 @@ pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-re
 export "PYTHONPATH=$PYTHONPATH:$(pwd)/lichess_bot"
 
 # Construye el comando base
-CMD="python3 \"$SCRIPT\" --num_puzzles 10 --agent \"$ENGINE_NAME\" --input_file \"$INPUT_FILE\" --output_file \"$OUTPUT_FILE\"" 
+CMD="python3 \"$SCRIPT\" --agent \"$ENGINE_NAME\" --input_file \"$INPUT_FILE\" --output_file \"$OUTPUT_FILE\"" 
 
 # Agrega los parámetros opcionales si están definidos
 if [ -n "$DEPTH" ]; then

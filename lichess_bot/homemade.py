@@ -497,7 +497,7 @@ class ThinkMore_9M(ExampleEngine):
                         # Hay tablas: ahogado, repetición, material insuficiente, etc.
                         return 0.5
                     elif situation.termination == chess.Termination.CHECKMATE:
-                        return 0.0  # el jugador actual ha perdido
+                        return 0.0001  # el jugador actual ha perdido
                 else:
                     logging.warning("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
                     exit()
