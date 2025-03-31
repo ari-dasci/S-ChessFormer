@@ -276,7 +276,7 @@ class ThinkMore_9M_bot(ExampleEngine):
             else:
                 top_eval = np.inf
             #print('--------------INIT MINIMAX--------------')
-            for move in board.legal_moves:
+            for move in engine_lib.get_ordered_legal_moves(board):
                 board.push(move)
 
                 #print("EVALUATING MOVE: ", move)
@@ -434,7 +434,7 @@ class ThinkMore_9M(ExampleEngine):
                 top_eval = np.inf
             #print('--------------INIT MINIMAX--------------')
             logging.info(f"INIT MINIMAX with depth: {depth}")
-            for move in board.legal_moves:
+            for move in engine_lib.get_ordered_legal_moves(board):
                 board.push(move)
 
                 logging.info(f"EVALUATING MOVE: {move}")
