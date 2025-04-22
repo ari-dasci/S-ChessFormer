@@ -51,7 +51,8 @@ conda install pip -y
 pip install -r "$(pwd)"/requirements.txt
 
 # Usa la GPU
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+#pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install jax[cuda12_pip]==0.5.3 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 # Exporta la variable de entorno PYTHONPATH
 export "PYTHONPATH=$PYTHONPATH:$(pwd)/lichess_bot"
