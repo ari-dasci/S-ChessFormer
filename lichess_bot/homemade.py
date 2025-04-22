@@ -37,14 +37,14 @@ import pandas as pd
 import numpy as np
 
 from jax import random as jrandom
-
+import time
 
 
 
 # Use this logger variable to print messages to the console or log files.
 # logger.info("message") will always print "message" to the console or log file.
-# logger.debug("message") will only print "message" if verbose logging is enabled.
-logger = logging.getLogger(__name__)
+# logger.debug("message") will only print "message" if verbose #logging is enabled.
+#logger = #logging.getLogger(__name__)
 
 
 class ExampleEngine(MinimalEngine):
@@ -276,7 +276,7 @@ class ThinkMore_9M_bot(ExampleEngine):
             else:
                 top_eval = np.inf
             #print('--------------INIT MINIMAX--------------')
-            for move in engine_lib.get_ordered_legal_moves(board):
+            for move in board.legal_moves:
                 board.push(move)
 
                 #print("EVALUATING MOVE: ", move)
@@ -342,6 +342,8 @@ class ThinkMore_9M_bot(ExampleEngine):
                 if beta <= alpha:
                     #print(f"Poda: {beta} <= {alpha}")
                     break
+
+
             return max_eval
         else:
             min_eval = np.inf
@@ -354,15 +356,165 @@ class ThinkMore_9M_bot(ExampleEngine):
                 if beta <= alpha:
                     #print(f"Poda: {beta} <= {alpha}")
                     break
+
             return min_eval
 
+# Las siguientes clases implementan el motor de ajedrez 9M, 136M y 270M con profundidad. Se implementan las clases de tal forma que el código común (minimax y evaluate_actions) se encuentra en la clase base, y las clases hijas solo implementan el constructor y el método analyse. De esta forma, si se quiere cambiar el motor de ajedrez, solo hay que cambiar el constructor y el método analyse, sin necesidad de modificar el resto del código.
 
-class ThinkMore_9M(ExampleEngine):
+class ThinkMoreTemplate(ExampleEngine):
+    """
+    Get a move using searchless chess engine with tree search.
+    """
+    def __init__(self, depth=3):  # Agregamos `cwd` para evitar el error
+        #super().__init__(commands, options, stderr, draw_or_resign, game, cwd=None)
+
+        # Guardamos el motor en un atributo de la clase
+        # Esta vez lo hacemos de forma manual para tener un mejor control de la arquitectura
+        # y poder obtener las valoraciones de cada movimiento.
+        self.depth=depth
+
+    def analyse(self,
+               board: chess.Board):
+              # time_limit: Limit,
+              # ponder: bool,  # noqa: ARG002
+              # draw_offered: bool,
+              # root_moves: MOVE):
+            top_move = None
+            depth = self.depth
+            evals = []
+
+            if board.turn == chess.WHITE:
+                top_eval = -np.inf
+            else:
+                top_eval = np.inf
+            #print('--------------INIT MINIMAX--------------')
+            #logging.info(f"INIT MINIMAX with depth: {depth}")
+            for move in engine.get_ordered_legal_moves(board):
+                board.push(move)
+
+                #logging.info(f"EVALUATING MOVE: {move}")
+
+                # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
+                #print("Turno:", board.turn)
+                eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
+
+                board.pop()
+                
+                # Si el bot juega con piezas negras, invertimos las probabilidades
+                if board.turn == chess.BLACK:
+                    eval = 1 - eval
+                    
+                evals.append(eval)
+                
+                # Nos quedamos con la mejor jugada para el jugador actual
+                if eval > top_eval:
+                    top_move = move
+                    top_eval = eval
+                #logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
+            #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
+            # Devolvemos la jugada
+            return {'top_move':PlayResult(top_move, None),'probs':evals}
+
+    def minimax(self, board : chess.Board, depth, alpha, beta, maximizing_player):
+        #print("DEPTH: ", depth)
+        if depth == 0 or board.is_game_over():
+            # Si es game over puede pasar:
+            # - mate: si lo doy yo, 1 si soy blancas (resp. -1 si soy negras), y -1 si me lo da el oponente (resp. ...)
+            # - tablas: 0.5---> hay empate
+            #  ---> Conviene usar 'outcome' de Chess, que da lo que ocurre en el tablero
+            
+            if len(engine.get_ordered_legal_moves(board)) == 0:  # No hay jugadas legales: puede ser jaque mate o tablas
+                situation = board.outcome()
+                
+                if situation is not None:
+                    who_wins = situation.winner
+                    if who_wins is None:
+                        # Hay tablas: ahogado, repetición, material insuficiente, etc.
+                        return 0.5
+                    elif situation.termination == chess.Termination.CHECKMATE:
+                        return 0.0001  # el jugador actual ha perdido
+                else:
+                    #logging.warning("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
+                    exit()
+            win_probs, _ = self.evaluate_actions(board, maximizing_player)
+            if maximizing_player:
+                best_win_prob = max(win_probs)
+            else:
+                best_win_prob = min(win_probs)
+            #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
+            return best_win_prob
+        #print("MINIMAX AT DEPTH: ", depth)
+        if maximizing_player:
+            #print("WHITE PLAYER")
+            max_eval = -np.inf
+            for move in engine.get_ordered_legal_moves(board):
+                #print("EVALUATING MOVE: ", move)
+                board.push(move)
+                eval = self.minimax(board, depth - 1, alpha, beta, False)
+                board.pop()
+                max_eval = max(max_eval, eval)
+                ##logging.info(f"NEW EVAL: {eval} \t\t MAX EVAL: {max_eval}")
+                alpha = max(alpha, eval)
+                if beta <= alpha:
+                    #print(f"Poda: {beta} <= {alpha}")
+                    break
+            return max_eval
+        else:
+            #print("BLACK PLAYER")
+            min_eval = np.inf
+            for move in engine.get_ordered_legal_moves(board):
+                board.push(move)
+                eval = self.minimax(board, depth - 1, alpha, beta, True)
+                board.pop()
+                min_eval = min(min_eval, eval)
+                ##logging.info(f"NEW EVAL: {eval} \t\t MIN EVAL: {min_eval}")
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    #print(f"Poda: {beta} <= {alpha}")
+                    break
+            return min_eval
+
+    def evaluate_actions(self, board, maximizing_player):
+        results = self.analyse_without_depth(board)
+        buckets_log_probs = results['log_probs']
+
+        # Compute the expected return
+        win_probs = np.inner(np.exp(buckets_log_probs), self.return_buckets_values)
+        # Si el bot juega con piezas negras, invertimos las probabilidades
+        if not maximizing_player:
+            win_probs = -win_probs + 1
+        #logging.info(f'###Probabilidades:{win_probs}. Maximizing player: {maximizing_player}')          
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        #print('WIN PROBS: ', win_probs)
+        #print('SORTED LEGAL MOVES: ', sorted_legal_moves)
+
+        return win_probs, sorted_legal_moves
+
+    def analyse_without_depth(self, board: chess.Board) -> engine.AnalysisResult:
+        """Returns buckets log-probs for each action, and FEN."""
+        # Tokenize the legal actions.
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        legal_actions = [utils.MOVE_TO_ACTION[x.uci()] for x in sorted_legal_moves]
+        legal_actions = np.array(legal_actions, dtype=np.int32)
+        legal_actions = np.expand_dims(legal_actions, axis=-1)
+        # Tokenize the return buckets.
+        dummy_return_buckets = np.zeros((len(legal_actions), 1), dtype=np.int32)
+        # Tokenize the board.
+        tokenized_fen = tokenizer.tokenize(board.fen()).astype(np.int32)
+        sequences = np.stack([tokenized_fen] * len(legal_actions))
+        # Create the sequences.
+        sequences = np.concatenate(
+            [sequences, legal_actions, dummy_return_buckets],
+            axis=1,
+        )
+        return {'log_probs': self.predict_fn(sequences)[:, -1], 'fen': board.fen()}
+
+class ThinkMore_9M(ThinkMoreTemplate):
     """
     Get a move using searchless chess 9M parameters engine with tree search.
     """
     def __init__(self, depth=3):  # Agregamos `cwd` para evitar el error
-        #super().__init__(commands, options, stderr, draw_or_resign, game, cwd=None)
+        super().__init__(depth)
 
         # Guardamos el motor 9M en un atributo de la clase
         # Esta vez lo hacemos de forma manual para tener un mejor control de la arquitectura
@@ -433,17 +585,16 @@ class ThinkMore_9M(ExampleEngine):
             else:
                 top_eval = np.inf
             #print('--------------INIT MINIMAX--------------')
-            logging.info(f"INIT MINIMAX with depth: {depth}")
+            #logging.info(f"INIT MINIMAX with depth: {depth}")
             for move in engine_lib.get_ordered_legal_moves(board):
                 board.push(move)
 
-                logging.info(f"EVALUATING MOVE: {move}")
+                #logging.info(f"EVALUATING MOVE: {move}")
 
                 # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
                 #print("Turno:", board.turn)
                 eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
 
-                logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
                 board.pop()
                 
                 # Si el bot juega con piezas negras, invertimos las probabilidades
@@ -456,30 +607,424 @@ class ThinkMore_9M(ExampleEngine):
                 if eval > top_eval:
                     top_move = move
                     top_eval = eval
-                
+                #logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
 
             #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
 
             # Devolvemos la jugada
             return {'top_move':PlayResult(top_move, None),'probs':evals}
 
-    def evaluate_actions(self, board, maximizing_player):
-        results = self.analyse_without_depth(board)
-        buckets_log_probs = results['log_probs']
 
-        # Compute the expected return
-        win_probs = np.inner(np.exp(buckets_log_probs), self.return_buckets_values)
-        # Si el bot juega con piezas negras, invertimos las probabilidades
-        if not maximizing_player:
-            win_probs = -win_probs + 1
+
+class ThinkMore_136M(ThinkMoreTemplate):
+    """
+    Get a move using searchless chess 136M parameters engine with tree search.
+    """
+    def __init__(self, depth=3):  # Agregamos `cwd` para evitar el error
+        super().__init__(depth)
+
+        # Guardamos el motor 136M en un atributo de la clase
+        # Esta vez lo hacemos de forma manual para tener un mejor control de la arquitectura
+        # y poder obtener las valoraciones de cada movimiento.
+        policy = 'action_value'
+        num_return_buckets = 128
+        output_size = num_return_buckets
+        self.depth=depth
+        predictor_config = transformer.TransformerConfig(
+            vocab_size=utils.NUM_ACTIONS,
+            output_size=output_size,
+            pos_encodings=transformer.PositionalEncodings.LEARNED,
+            max_sequence_length=tokenizer.SEQUENCE_LENGTH + 2,
+            num_heads=8,
+            num_layers=8,
+            embedding_dim=1024,
+            apply_post_ln=True,
+            apply_qk_layernorm=False,
+            use_causal_mask=False,
+        )
+
+        predictor = transformer.build_transformer_predictor(config=predictor_config)
+
+        checkpoint_dir = os.path.join(
+
+        os.getcwd(),
+            f'searchless_chess/checkpoints/136M',
+        )
+        dummy_params = predictor.initial_params(
+            rng=jrandom.PRNGKey(6400000),
+            targets=np.zeros((1, 1), dtype=np.uint32),
+        )
+        params = training_utils.load_parameters(
+            checkpoint_dir=checkpoint_dir,
+            params=dummy_params,
+            use_ema_params=True,
+            step=-1,
+        )
+
+        self.predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=32)
+
+        _, self.return_buckets_values = utils.get_uniform_buckets_edges_values(
+            num_return_buckets
+        )
+
+        self._return_buckets_values = self.return_buckets_values
+
+        self.neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
+            return_buckets_values=self.return_buckets_values,
+            predict_fn=self.predict_fn,
+            temperature=0.005,
+        )
+
+    def analyse(self,
+               board: chess.Board):
+              # time_limit: Limit,
+              # ponder: bool,  # noqa: ARG002
+              # draw_offered: bool,
+              # root_moves: MOVE):
+
+            top_move = None
+            depth = self.depth
+            evals = []
+
+            # Opposite of our minimax
+            if board.turn == chess.WHITE:
+                top_eval = -np.inf
+            else:
+                top_eval = np.inf
+            #print('--------------INIT MINIMAX--------------')
+            #logging.info(f"INIT MINIMAX with depth: {depth}")
+            for move in engine_lib.get_ordered_legal_moves(board):
+                board.push(move)
+
+                #logging.info(f"EVALUATING MOVE: {move}")
+
+                # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
+                #print("Turno:", board.turn)
+                eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
+
+                board.pop()
+                
+                # Si el bot juega con piezas negras, invertimos las probabilidades
+                if board.turn == chess.BLACK:
+                    eval = 1 - eval
+                    
+                evals.append(eval)
+                
+                # Nos quedamos con la mejor jugada para el jugador actual
+                if eval > top_eval:
+                    top_move = move
+                    top_eval = eval
+                #logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
+
+            #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
+
+            # Devolvemos la jugada
+            return {'top_move':PlayResult(top_move, None),'probs':evals}
+
+
+
+class ThinkMore_270M(ThinkMoreTemplate):
+    """
+    Get a move using searchless chess 270M parameters engine with tree search.
+    """
+    def __init__(self, depth=3):  # Agregamos `cwd` para evitar el error
+        super().__init__(depth)
+
+        # Guardamos el motor 270M en un atributo de la clase
+        # Esta vez lo hacemos de forma manual para tener un mejor control de la arquitectura
+        # y poder obtener las valoraciones de cada movimiento.
+        policy = 'action_value'
+        num_return_buckets = 128
+        output_size = num_return_buckets
+        self.depth=depth
+        predictor_config = transformer.TransformerConfig(
+            vocab_size=utils.NUM_ACTIONS,
+            output_size=output_size,
+            pos_encodings=transformer.PositionalEncodings.LEARNED,
+            max_sequence_length=tokenizer.SEQUENCE_LENGTH + 2,
+            num_heads=8,
+            num_layers=16,
+            embedding_dim=1024,
+            apply_post_ln=True,
+            apply_qk_layernorm=False,
+            use_causal_mask=False,
+        )
+
+        predictor = transformer.build_transformer_predictor(config=predictor_config)
+
+        checkpoint_dir = os.path.join(
+
+        os.getcwd(),
+            f'searchless_chess/checkpoints/270M',
+        )
+        dummy_params = predictor.initial_params(
+            rng=jrandom.PRNGKey(6400000),
+            targets=np.zeros((1, 1), dtype=np.uint32),
+        )
+        params = training_utils.load_parameters(
+            checkpoint_dir=checkpoint_dir,
+            params=dummy_params,
+            use_ema_params=True,
+            step=-1,
+        )
+
+        self.predict_fn = neural_engines.wrap_predict_fn(predictor, params, batch_size=32)
+
+        _, self.return_buckets_values = utils.get_uniform_buckets_edges_values(
+            num_return_buckets
+        )
+
+        self._return_buckets_values = self.return_buckets_values
+
+        self.neural_engine = neural_engines.ENGINE_FROM_POLICY[policy](
+            return_buckets_values=self.return_buckets_values,
+            predict_fn=self.predict_fn,
+            temperature=0.005,
+        )
+
+    def analyse(self,
+               board: chess.Board):
+              # time_limit: Limit,
+              # ponder: bool,  # noqa: ARG002
+              # draw_offered: bool,
+              # root_moves: MOVE):
+
+            top_move = None
+            depth = self.depth
+            evals = []
+
+            # Opposite of our minimax
+            if board.turn == chess.WHITE:
+                top_eval = -np.inf
+                
+            else:
+                top_eval = np.inf
+            #print('--------------INIT MINIMAX--------------')
+            #logging.info(f"INIT MINIMAX with depth: {depth}")
+            for move in engine_lib.get_ordered_legal_moves(board):
+                board.push(move)
+
+                #logging.info(f"EVALUATING MOVE: {move}")
+
+                # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
+                #print("Turno:", board.turn)
+                eval = self.minimax(board, depth - 1, -np.inf, np.inf, board.turn)
+
+                board.pop()
+                
+                # Si el bot juega con piezas negras, invertimos las probabilidades
+                if board.turn == chess.BLACK:
+                    eval = 1 - eval
+                    
+                evals.append(eval)
+                
+                # Nos quedamos con la mejor jugada para el jugador actual
+                if eval > top_eval:
+                    top_move = move
+                    top_eval = eval
+                #logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
+
+            #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
+
+            # Devolvemos la jugada
+            return {'top_move':PlayResult(top_move, None),'probs':evals}
+
+
+
+class AlgorithmProposed(ThinkMoreTemplate):
+    """
+        Our proposed algorithm. A tree search with 9M evaluations and, in a certain level, a 270M reevaluations
+    """
+    def __init__(self,depth=5,reeval_level=2,N_moves_preev=10):
+        super().__init__(depth)
+        self.nodos_explorados = 0
+        # Guardamos el motor 9M en un atributo de la clase para las predicciones oportunas
+        policy = 'action_value'
+        num_return_buckets = 128
+        output_size = num_return_buckets
+        self.depth=depth
+        predictor_config = transformer.TransformerConfig(
+            vocab_size=utils.NUM_ACTIONS,
+            output_size=output_size,
+            pos_encodings=transformer.PositionalEncodings.LEARNED,
+            max_sequence_length=tokenizer.SEQUENCE_LENGTH + 2,
+            num_heads=8,
+            num_layers=8,
+            embedding_dim=256,
+            apply_post_ln=True,
+            apply_qk_layernorm=False,
+            use_causal_mask=False,
+        )
+        predictor = transformer.build_transformer_predictor(config=predictor_config)
+        checkpoint_dir = os.path.join(
+        os.getcwd(),
+            f'searchless_chess/checkpoints/9M',
+        )
+        dummy_params = predictor.initial_params(
+            rng=jrandom.PRNGKey(6400000),
+            targets=np.zeros((1, 1), dtype=np.uint32),
+        )
+        params = training_utils.load_parameters(
+            checkpoint_dir=checkpoint_dir,
+            params=dummy_params,
+            use_ema_params=True,
+            step=-1,
+        )
+        self.predict_fn_9M = neural_engines.wrap_predict_fn(predictor, params, batch_size=32)
+        _, self.return_buckets_values_9M = utils.get_uniform_buckets_edges_values(
+            num_return_buckets
+        )
+        self._return_buckets_values_9M = self.return_buckets_values_9M
+        self.neural_engine_9M = neural_engines.ENGINE_FROM_POLICY[policy](
+            return_buckets_values=self.return_buckets_values_9M,
+            predict_fn=self.predict_fn_9M,
+            temperature=0.005,
+        )
+        # Guardamos el motor 270M en un atributo de la clase para las reevaluaciones
+        policy = 'action_value'
+        num_return_buckets = 128
+        output_size = num_return_buckets
+        self.depth=depth
+        predictor_config = transformer.TransformerConfig(
+            vocab_size=utils.NUM_ACTIONS,
+            output_size=output_size,
+            pos_encodings=transformer.PositionalEncodings.LEARNED,
+            max_sequence_length=tokenizer.SEQUENCE_LENGTH + 2,
+            num_heads=8,
+            num_layers=16,
+            embedding_dim=1024,
+            apply_post_ln=True,
+            apply_qk_layernorm=False,
+            use_causal_mask=False,
+        )
+        predictor = transformer.build_transformer_predictor(config=predictor_config)
+        checkpoint_dir = os.path.join(
+        os.getcwd(),
+            f'searchless_chess/checkpoints/270M',
+        )
+        dummy_params = predictor.initial_params(
+            rng=jrandom.PRNGKey(6400000),
+            targets=np.zeros((1, 1), dtype=np.uint32),
+        )
+        params = training_utils.load_parameters(
+            checkpoint_dir=checkpoint_dir,
+            params=dummy_params,
+            use_ema_params=True,
+            step=-1,
+        )
+        self.predict_fn_270M = neural_engines.wrap_predict_fn(predictor, params, batch_size=32)
+        _, self.return_buckets_values_270M = utils.get_uniform_buckets_edges_values(
+            num_return_buckets
+        )
+        self._return_buckets_values_270M = self.return_buckets_values_270M
+        self.neural_engine_270M = neural_engines.ENGINE_FROM_POLICY[policy](
+            return_buckets_values=self.return_buckets_values_270M,
+            predict_fn=self.predict_fn_270M,
+            temperature=0.005,
+        )
+
+        # Guardamos el nivel de reevaluación en un atributo de la clase
+        self.reeval_level = reeval_level
+
+        # Guardamos el número de movimientos a preevaluar en un atributo de la clase
+        self.N_moves_preev = N_moves_preev
+
+
+
+    def analyse(self , board:chess.Board):
+        # time_limit: Limit,
+        # ponder: bool,  # noqa: ARG002
+        # draw_offered: bool,
+        # root_moves: MOVE):
+            self.nodos_explorados = 0
+         #   top_move = None
+            depth = self.depth
+            evals = []
             
-        sorted_legal_moves = engine.get_ordered_legal_moves(board)
-        #print('WIN PROBS: ', win_probs)
-        #print('SORTED LEGAL MOVES: ', sorted_legal_moves)
 
-        return win_probs, sorted_legal_moves
+            # Opposite of our minimax
+            """
+            if board.turn == chess.WHITE:
+                top_eval = -np.inf
+            else:
+                top_eval = np.inf    
+            """
+            start_time_preevaluations = time.perf_counter()
+            # Now we get ordered legal moves decreasing according to the 270M engine
+            win_probs, sorted_legal_moves = self.evaluate_actions_with_270M(board, True)
+
+            # Ahora asociamos movimientos a sus probabilidades
+            move_probs = dict(zip(sorted_legal_moves, win_probs))
+
+            # Ordenamos según probabilidad de forma descendente (mayor a menor prob de victoria)
+            movs_preevaled = sorted(move_probs.items(), key=lambda x: x[1], reverse=True)[:self.N_moves_preev]
 
 
+            #logging.info("All moves %s", move_probs)
+            #logging.info("Info about preevaluations: %s", movs_preevaled)
+            # Nos quedamos solo con esos N mejores movimientos según 270M
+            movs_preevaled = [move for move, _ in movs_preevaled]
+            end_time_preevaluations = time.perf_counter()
+            #logging.info("Time for preevaluations: %s seconds. Number of moves preevaluated: %s", end_time_preevaluations - start_time_preevaluations, len(movs_preevaled))
+            #print('--------------INIT MINIMAX--------------')
+            #logging.info(f"INIT MINIMAX with depth: {depth}")
+            # Iteramos sobre los N mejores movimientos según 270M desde el mejor hasta el N-ésimo
+            alpha = -np.inf
+            beta = np.inf
+
+            start_time_algorithm = time.perf_counter()
+            for move in movs_preevaled:
+                start_time_move_evaluation = time.perf_counter()
+                board.push(move)
+
+                #logging.info(f"EVALUATING MOVE: {move}")
+
+                # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
+                #print("Turno:", board.turn)
+                eval, _ = self.minimax(board, depth - 1, alpha, beta, board.turn)
+
+                board.pop()
+                
+                # Si el bot juega con piezas negras, invertimos las probabilidades
+                if board.turn == chess.BLACK:
+                    eval = 1 - eval
+                    
+                evals.append(eval)
+                
+                # Nos quedamos con la mejor jugada para el jugador actual
+                """"
+                if eval > top_eval and board.turn == chess.WHITE:
+                    top_move = move
+                    top_eval = eval
+                elif eval < top_eval and board.turn == chess.BLACK:
+                    top_move = move
+                    top_eval = eval
+                """
+                if board.turn == chess.WHITE:
+                    alpha = max(alpha, eval)
+                else:
+                    beta = min(beta, eval)
+                end_time_move_evaluation = time.perf_counter()
+                #logging.info("Time for move evaluated: %s seconds. Move evaluated: %s", end_time_move_evaluation - start_time_move_evaluation, move)
+                
+                #logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
+                if beta <= alpha:
+                    #logging.info("PODA NODO RAIZ")
+                    break
+
+            #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
+            end_time_algorithm = time.perf_counter()
+            #logging.info("Time for algorithm: %s seconds. Number of moves evaluated: %s", end_time_algorithm - start_time_algorithm, len(movs_preevaled))
+           # #logging.info("Selected move: %s", top_move)
+           # #logging.info("Final evaluation of the move: %s", top_eval)
+
+
+
+
+
+            # Devolvemos la jugada
+            return {'top_move':PlayResult(None, None),'probs':evals}
+    """
     def minimax(self, board : chess.Board, depth, alpha, beta, maximizing_player):
         #print("DEPTH: ", depth)
         if depth == 0 or board.is_game_over():
@@ -490,59 +1035,242 @@ class ThinkMore_9M(ExampleEngine):
             
             if len(engine.get_ordered_legal_moves(board)) == 0:  # No hay jugadas legales: puede ser jaque mate o tablas
                 situation = board.outcome()
-                
+                #logging.info(f"Situation: {situation}")
                 if situation is not None:
                     who_wins = situation.winner
                     if who_wins is None:
                         # Hay tablas: ahogado, repetición, material insuficiente, etc.
-                        return 0.5
+                        return 0.5, board
                     elif situation.termination == chess.Termination.CHECKMATE:
-                        return 0.0001  # el jugador actual ha perdido
+                        return 0.0001, board  # el jugador actual ha perdido
                 else:
-                    logging.warning("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
+                    #logging.warning("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
                     exit()
 
-            win_probs, _ = self.evaluate_actions(board, maximizing_player)
+            #win_probs, _ = self.evaluate_actions_with_9M(board, maximizing_player)
+            win_probs = heuristica_valor_material(board)+random.uniform(0.5, 2.5)
+            aux=""
+            for i in range(self.depth-depth):
+                aux+="#"
+            #logging.info("%s%s",aux,win_probs, "Nodo EVAL")
+            return win_probs, board
+            #if maximizing_player:
+            #    best_win_prob = max(win_probs)
+            #else:
+            #    best_win_prob = min(win_probs)
+            #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
+           # return best_win_prob, board
+        
+
+        best_board = None
+        best_move = None
+        #logging.info("Maximizing player: %s", maximizing_player)
+        if maximizing_player:
+            max_eval = -np.inf
+
+            for move in engine.get_ordered_legal_moves(board):
+                board.push(move)
+                score, to_update_board = self.minimax(board, depth-1, alpha, beta, False)
+                board.pop()
+
+                
+               # #logging.info("%s%s",aux,score," Nodo MAX")
+                if score > max_eval:
+                    max_eval = score
+                    aux=""
+                    for i in range(self.depth-depth):
+                        aux+="#"
+                    #logging.info("Actualising max_eval: %s%s",aux, max_eval, "Nodo MAX")
+                    if to_update_board is not None:
+                        #logging.info("Actualising best_board: %s", to_update_board.fen())
+                    else:
+                        #logging.info("Actualising best_board: None")
+                    best_board = to_update_board
+                    best_move = move
+                
+                if to_update_board is None:
+                    best_board = None
+                alpha = max(alpha, max_eval)
+                if beta <= alpha:
+                    aux="Poda en el depth: "
+                    #logging.info("%s%s",aux, depth)
+                    break
+
+            if depth == self.reeval_level and best_board is not None:
+                #win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
+                #move_probs = dict(zip(sorted_moves, win_probs))
+                #return move_probs.get(best_move, max_eval), None            # Devuelve la prob victoria asociada al mejor mov y, si no existe, devuelve max_eval
+                max_eval = heuristica_valor_posicional_caballo(best_board)
+                aux=""
+                for i in range(self.depth-depth):
+                    aux+="#"
+                aux+="Reevaluating with a stronger heuristic-->"
+                #logging.info("%s%s",aux, max_eval, "Nodo MAX")
+                return max_eval, None
+            else:
+                return max_eval, best_board
+
+        else:
+            min_eval = np.inf
+
+            for move in engine.get_ordered_legal_moves(board):
+                board.push(move)
+                score, to_update_board = self.minimax(board, depth-1, alpha, beta, True)
+                board.pop()
+                aux=""
+                for i in range(self.depth-depth):
+                    aux+="#"
+               # #logging.info("%s%s",aux,score,"Nodo MIN")
+                if score < min_eval:
+                    min_eval = score
+                    #logging.info("Actualising min_eval: %s%s",aux,min_eval," Nodo MIN")
+                    if to_update_board is not None:
+                        #logging.info("Actualising best_board: %s", to_update_board.fen())
+                    else:
+                        #logging.info("Actualising best_board: None")
+                    best_board = to_update_board
+                    best_move = move
+
+                if to_update_board is None:
+                    best_board = None
+                beta = min(beta, min_eval)
+                if beta <= alpha:
+                    aux="Poda en el depth: "
+                    #logging.info("%s%s",aux, depth)
+                    break 
+
+            if depth == self.reeval_level and best_board is not None:
+                #win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
+                #move_probs = dict(zip(sorted_moves, win_probs))
+                #return move_probs.get(best_move, min_eval), best_board
+                min_eval = heuristica_valor_posicional_caballo(best_board)
+                aux=""
+                for i in range(self.depth-depth):
+                    aux+="#"
+                aux+="Reevaluating with a stronger heuristic-->"
+                #logging.info("%s%s",aux, min_eval, "Nodo MIN")
+                return min_eval, None            
+            else:
+                return min_eval, best_board
+    """
+
+    def minimax(self, board: chess.Board, depth, alpha, beta, maximizing_player):
+        self.nodos_explorados += 1
+
+        if depth == 0 or board.is_game_over():
+            if len(engine.get_ordered_legal_moves(board)) == 0:
+                outcome = board.outcome()
+                if outcome is not None:
+                    if outcome.winner is None:
+                        return 0.5, board  # tablas
+                    elif outcome.termination == chess.Termination.CHECKMATE:
+                        return 0.0001, board  # derrota
+                else:
+                    #logging.warning("No outcome found despite no legal moves.")
+                    return 0.5, board
+
+           # if maximizing_player:
+           #     ma_val = -np.inf
+           # else:
+           #     mi_val = np.inf
+            win_probs, _ = self.evaluate_actions_with_9M(board, maximizing_player)
             if maximizing_player:
                 best_win_prob = max(win_probs)
             else:
                 best_win_prob = min(win_probs)
             #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
-            return best_win_prob
-        
-        logging.info(f"MINIMAX AT DEPTH: {depth}")
+            #for m in engine.get_ordered_legal_moves(board):
+            #    value = MiguelHeuristic(m, board)
+            #    if maximizing_player:
+            #        ma_val = max(ma_val, value)
+            #    else:
+            #        mi_val = min(mi_val, value)
+
+            aux = "#" * (self.depth - depth)
+            #if maximizing_player:
+                #logging.info("%s Nodo EVAL MAX: %s", aux, ma_val)
+            #    value = ma_val
+            #else:
+                #logging.info("%s Nodo EVAL MIN: %s", aux, mi_val)
+            #    value = mi_val
+
+            return best_win_prob, board
+
+        best_board = None
+        best_move = None
+
         if maximizing_player:
-            logging.info(f"WHITE PLAYER")
             max_eval = -np.inf
             for move in engine.get_ordered_legal_moves(board):
-                #print("EVALUATING MOVE: ", move)
                 board.push(move)
-                eval = self.minimax(board, depth - 1, alpha, beta, False)
+                eval, next_board = self.minimax(board, depth - 1, alpha, beta, False)
                 board.pop()
-                max_eval = max(max_eval, eval)
-                logging.info(f"NEW EVAL: {eval} \t\t MAX EVAL: {max_eval}")
-                alpha = max(alpha, eval)
+
+                if eval > max_eval:
+                    max_eval = eval
+                    best_board = next_board
+                    best_move = move
+
+                alpha = max(alpha, max_eval)
                 if beta <= alpha:
-                    #print(f"Poda: {beta} <= {alpha}")
+                    ###logging.info("%s Poda en profundidad: %d", "#" * (self.depth - depth), depth)
                     break
-            return max_eval
+
+            if depth == self.reeval_level and best_board is not None:
+                win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
+                move_probs = dict(zip(sorted_moves, win_probs))
+                reevaluated = move_probs.get(best_move, max_eval)
+                #logging.info("%s Reevaluating -> %s", "#" * (self.depth - depth), reevaluated)
+                return reevaluated, None
+            else:
+                return max_eval, best_board
+
         else:
-            logging.info(f"BLACK PLAYER")
             min_eval = np.inf
             for move in engine.get_ordered_legal_moves(board):
                 board.push(move)
-                eval = self.minimax(board, depth - 1, alpha, beta, True)
+                eval, next_board = self.minimax(board, depth - 1, alpha, beta, True)
                 board.pop()
-                min_eval = min(min_eval, eval)
-                logging.info(f"NEW EVAL: {eval} \t\t MIN EVAL: {min_eval}")
-                beta = min(beta, eval)
+
+                if eval < min_eval:
+                    min_eval = eval
+                    best_board = next_board
+                    best_move = move
+
+                beta = min(beta, min_eval)
                 if beta <= alpha:
-                    #print(f"Poda: {beta} <= {alpha}")
+                    #logging.info("%s Poda en profundidad: %d", "#" * (self.depth - depth), depth)
                     break
-            return min_eval
+
+            if depth == self.reeval_level and best_board is not None:
+                win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
+                move_probs = dict(zip(sorted_moves, win_probs))
+                reevaluated = move_probs.get(best_move, min_eval)
+                #logging.info("%s Reevaluating -> %s", "#" * (self.depth - depth), reevaluated)
+                return reevaluated, None
+            else:
+                return min_eval, best_board
 
 
-    def analyse_without_depth(self, board: chess.Board) -> engine.AnalysisResult:
+            
+
+    def evaluate_actions_with_9M(self, board, maximizing_player):
+        results = self.analyse_without_depth_with_9M(board)
+        buckets_log_probs = results['log_probs']
+
+        # Compute the expected return
+        win_probs = np.inner(np.exp(buckets_log_probs), self.return_buckets_values_9M)
+        # Si el bot juega con piezas negras, invertimos las probabilidades
+        if not maximizing_player:
+            win_probs = -win_probs + 1
+        #logging.info(f'###Probabilidades:{win_probs}. Maximizing player: {maximizing_player}')          
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        #print('WIN PROBS: ', win_probs)
+        #print('SORTED LEGAL MOVES: ', sorted_legal_moves)
+
+        return win_probs, sorted_legal_moves
+
+    def analyse_without_depth_with_9M(self, board: chess.Board) -> engine.AnalysisResult:
         """Returns buckets log-probs for each action, and FEN."""
         # Tokenize the legal actions.
         sorted_legal_moves = engine.get_ordered_legal_moves(board)
@@ -559,4 +1287,147 @@ class ThinkMore_9M(ExampleEngine):
             [sequences, legal_actions, dummy_return_buckets],
             axis=1,
         )
-        return {'log_probs': self.predict_fn(sequences)[:, -1], 'fen': board.fen()}
+        return {'log_probs': self.predict_fn_9M(sequences)[:, -1], 'fen': board.fen()}
+        
+
+    def evaluate_actions_with_270M(self, board, maximizing_player):
+        results = self.analyse_without_depth_with_270M(board)
+        buckets_log_probs = results['log_probs']
+
+        # Compute the expected return
+        win_probs = np.inner(np.exp(buckets_log_probs), self.return_buckets_values_270M)
+        # Si el bot juega con piezas negras, invertimos las probabilidades
+        if not maximizing_player:
+            win_probs = -win_probs + 1
+        #logging.info(f'###Probabilidades:{win_probs}. Maximizing player: {maximizing_player}')          
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        #print('WIN PROBS: ', win_probs)
+        #print('SORTED LEGAL MOVES: ', sorted_legal_moves)
+
+        return win_probs, sorted_legal_moves
+
+    def analyse_without_depth_with_270M(self, board: chess.Board) -> engine.AnalysisResult:
+        """Returns buckets log-probs for each action, and FEN."""
+        # Tokenize the legal actions.
+        sorted_legal_moves = engine.get_ordered_legal_moves(board)
+        legal_actions = [utils.MOVE_TO_ACTION[x.uci()] for x in sorted_legal_moves]
+        legal_actions = np.array(legal_actions, dtype=np.int32)
+        legal_actions = np.expand_dims(legal_actions, axis=-1)
+        # Tokenize the return buckets.
+        dummy_return_buckets = np.zeros((len(legal_actions), 1), dtype=np.int32)
+        # Tokenize the board.
+        tokenized_fen = tokenizer.tokenize(board.fen()).astype(np.int32)
+        sequences = np.stack([tokenized_fen] * len(legal_actions))
+        # Create the sequences.
+        sequences = np.concatenate(
+            [sequences, legal_actions, dummy_return_buckets],
+            axis=1,
+        )
+        return {'log_probs': self.predict_fn_270M(sequences)[:, -1], 'fen': board.fen()}
+    
+
+def heuristica_valor_material(board: chess.Board):
+    valores = {
+        chess.PAWN: 1,
+        chess.KNIGHT: 3,
+        chess.BISHOP: 3,
+        chess.ROOK: 5,
+        chess.QUEEN: 9,
+        chess.KING: 0
+    }
+
+    puntuacion = 0
+
+    for pieza_tipo in valores:
+        puntuacion+=len(board.pieces(pieza_tipo, chess.WHITE))*valores[pieza_tipo]
+        puntuacion-=len(board.pieces(pieza_tipo, chess.BLACK))*valores[pieza_tipo]
+
+    return puntuacion
+
+
+def heuristica_valor_posicional_caballo(board: chess.Board):
+    # Tabla de caballos para blancas (fila 0 = fila 1 del tablero)
+    tabla_caballo = [
+        [-5, -4, -3, -3, -3, -3, -4, -5],
+        [-4, -2,  0,  0,  0,  0, -2, -4],
+        [-3,  0,  1,  1.5, 1.5, 1,  0, -3],
+        [-3, 0.5, 1.5, 2, 2, 1.5, 0.5, -3],
+        [-3, 0.5, 1.5, 2, 2, 1.5, 0.5, -3],
+        [-3, 0, 1, 1.5, 1.5, 1, 0, -3],
+        [-4, -2, 0, 0.5, 0.5, 0, -2, -4],
+        [-5, -4, -3, -3, -3, -3, -4, -5]
+    ]
+
+    puntuacion = 0
+    for square in chess.SQUARES:
+        pieza = board.piece_at(square)
+        if pieza is not None:
+            tipo = pieza.piece_type
+            color = pieza.color
+            valor = 0
+
+            if tipo == chess.KNIGHT:
+                fila = chess.square_rank(square)
+                col = chess.square_file(square)
+                if color == chess.WHITE:
+                    valor += tabla_caballo[fila][col]
+                else:
+                    valor -= tabla_caballo[7 - fila][col]
+
+            # Suma valor material
+            if tipo == chess.PAWN:
+                valor += 1
+            elif tipo == chess.KNIGHT:
+                valor += 3
+            elif tipo == chess.BISHOP:
+                valor += 3
+            elif tipo == chess.ROOK:
+                valor += 5
+            elif tipo == chess.QUEEN:
+                valor += 9
+            # El rey se evalúa por posición o seguridad, lo ignoramos aquí
+
+            if color == chess.WHITE:
+                puntuacion += valor
+            else:
+                puntuacion -= valor
+
+    return puntuacion
+
+def MiguelHeuristic(move, board: chess.Board):
+    PIECE_VALUES = {
+        chess.PAWN: 100,
+        chess.KNIGHT: 320,
+        chess.BISHOP: 330,
+        chess.ROOK: 500,
+        chess.QUEEN: 900,
+        chess.KING: 20000  # No se usa realmente en evaluación
+    }
+
+
+    score = 0
+
+    # Si es una captura
+    if board.is_capture(move):
+        src_piece = board.piece_at(move.from_square)
+        dest_piece = board.piece_at(move.to_square)
+
+        if dest_piece is not None and src_piece is not None:   # El segundo condicional lo hemos añadido
+            score += 10 * PIECE_VALUES[dest_piece.piece_type] - PIECE_VALUES[src_piece.piece_type]
+        elif board.is_en_passant(move):
+            score += PIECE_VALUES[chess.PAWN]
+
+    # Si es una promoción
+    if move.promotion:
+        score += PIECE_VALUES[move.promotion]
+
+    # Simular el tablero después de hacer la jugada
+    new_board = board.copy()
+    new_board.push(move)
+
+    # Si después de mover el rey queda bajo ataque
+    king_square = new_board.king(not board.turn)
+    if king_square is not None and new_board.is_attacked_by(board.turn, king_square):
+        score += 50
+
+    return score
