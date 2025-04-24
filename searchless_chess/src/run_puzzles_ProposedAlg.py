@@ -132,7 +132,7 @@ def main(argv: Sequence[str]) -> None:
     puzzles = pd.read_csv(puzzles_file, nrows=_NUM_PUZZLES.value)
   
   if _AGENT.value == 'AlgorithmProposed':
-    depths = [2, 3, 4, 5]
+    depths = [2, 3, 4]
     all_results = []
 
     evaluated_puzzles = puzzles.copy()
@@ -156,6 +156,7 @@ def main(argv: Sequence[str]) -> None:
 
         column_name = _AGENT.value + '_results_depth_' + str(depth)
         evaluated_puzzles[column_name] = results_list
+    evaluated_puzzles.to_csv(output_file, index=False)
 
   elif _AGENT.value == 'AlgorithmProposedIterative':
     depths = [2, 3, 4, 5]
@@ -170,10 +171,13 @@ def main(argv: Sequence[str]) -> None:
               logging.info(f"Selected model: depth {depth} with method {method} and value {value}")
               if method == 'N_best':
                 engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=value, percentage=None, percentage_epsilon=None)
+                column_name = _AGENT.value + '_results_depth_' + str(depth) + '_N_best_' + str(value)
               elif method == 'percentage':
                 engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=None, percentage=value, percentage_epsilon=None)
+                column_name = _AGENT.value + '_results_depth_' + str(depth) + '_percentage_' + str(value)
               elif method == 'percentage_epsilon':
                 engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=None, percentage=None, percentage_epsilon=value)
+                column_name = _AGENT.value + '_results_depth_' + str(depth) + '_percentage_epsilon_' + str(value)
         results_list = []
 
         for i, puzzle in puzzles.iterrows():
@@ -189,7 +193,7 @@ def main(argv: Sequence[str]) -> None:
             logging.info("------------------------------------------------------------------------------------------------------------------------------")
             results_list.append(results)
 
-        column_name = _AGENT.value + '_results_depth_' + str(depth)
+        #column_name = _AGENT.value + '_results_depth_' + str(depth)
         evaluated_puzzles[column_name] = results_list
     evaluated_puzzles.to_csv(output_file, index=False)
 
