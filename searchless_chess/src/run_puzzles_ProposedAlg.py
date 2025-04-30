@@ -69,7 +69,7 @@ _AGENT = flags.DEFINE_enum(
     default='AlgorithmProposed',
     enum_values=[
         'AlgorithmProposed',
-       # 'AlgorithmProposedIterative'
+        'AlgorithmProposedIterative'
     ],
     help='The agent to evaluate.',
     required=False,
@@ -104,13 +104,13 @@ def analyse_puzzle_from_board_with_LST(
   return dict_results
 
 # Si se usa un método de búsqueda iterativa, pasamos el parámetro correspondiente y el resto como None
-def get_engine(agent: str, depth: int, reeval_level: int, iter_search_method: str = None, N_best = None, percentage = None, percentage_epsilon = None) -> engine_lib.Engine:
+def get_engine(agent: str,N_preevals: int, depth: int, reeval_level: int, iter_search_method: str = None, N_best = None, percentage = None, percentage_epsilon = None) -> engine_lib.Engine:
     """Returns the engine instance based on the agent and limit."""
 
     if iter_search_method is not None and _AGENT.value == 'AlgorithmProposed':   
-      return constants.get_algorithm_proposed(depth=depth,reeval_level=reeval_level,N_preevals=10, iter_search_method=iter_search_method, N_best=N_best, percentage=percentage, percentage_epsilon=percentage_epsilon)
+      return constants.get_algorithm_proposed(depth=depth,reeval_level=reeval_level,N_preevals=N_preevals, iter_search_method=iter_search_method, N_best=N_best, percentage=percentage, percentage_epsilon=percentage_epsilon)
     elif _AGENT.value == 'AlgorithmProposed':
-      return constants.get_algorithm_proposed(depth=depth,reeval_level=reeval_level,N_preevals=10)
+      return constants.get_algorithm_proposed(depth=depth,reeval_level=reeval_level,N_preevals=N_preevals)
 
 def main(argv: Sequence[str]) -> None:
   
@@ -133,68 +133,71 @@ def main(argv: Sequence[str]) -> None:
   
   if _AGENT.value == 'AlgorithmProposed':
     depths = [2, 3, 4]
+    n_preevals = [3,4,5,7,10]
     all_results = []
 
     evaluated_puzzles = puzzles.copy()
+    for n_preeval in n_preevals:
+      for depth in depths:
+          logging.info(f"Selected model: depth {depth} with n_preevals {n_preeval}")
+          engine = get_engine(_AGENT.value, N_preevals=n_preeval, depth=depth, reeval_level=depth-1)
+          results_list = []
 
-    for depth in depths:
-        engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1)
-        results_list = []
+          for i, puzzle in puzzles.iterrows():
+              board = chess.Board(puzzle['FEN'])
+              logging.info("------------------------------------------------------------------------------------------------------------------------------")
 
-        for i, puzzle in puzzles.iterrows():
-            board = chess.Board(puzzle['FEN'])
-            logging.info("------------------------------------------------------------------------------------------------------------------------------")
+              results = analyse_puzzle_from_board_with_LST(
+                  board=board,
+                  engine=engine
+              )
 
-            results = analyse_puzzle_from_board_with_LST(
-                board=board,
-                engine=engine
-            )
+              logging.info(f"Results puzzle {i+1}: {results}")
+              logging.info("------------------------------------------------------------------------------------------------------------------------------")
+              results_list.append(results)
 
-            logging.info(f"Results puzzle {i+1}: {results}")
-            logging.info("------------------------------------------------------------------------------------------------------------------------------")
-            results_list.append(results)
-
-        column_name = _AGENT.value + '_results_depth_' + str(depth)
-        evaluated_puzzles[column_name] = results_list
+          column_name = _AGENT.value + '_results_depth_' + str(depth) + '_preeval_' + str(n_preeval)
+          evaluated_puzzles[column_name] = results_list
     evaluated_puzzles.to_csv(output_file, index=False)
 
   elif _AGENT.value == 'AlgorithmProposedIterative':
     depths = [2, 3, 4, 5]
+    n_preevals = [3,4,5,7,10]
     iterative_methods = {'N_best': [5,6,7,8,9,10], 'percentage':{0.1,0.2,0.3,0.4,0.5}, 'percentage_epsilon':{0.1,0.2,0.3}}
     all_results = []
 
     evaluated_puzzles = puzzles.copy()
+    for n_preeval in n_preevals:
+      for depth in depths:
+          for method in iterative_methods:
+            for value in iterative_methods[method]:
+                logging.info(f"Selected model: depth {depth} with n_preevals {n_preeval} and method {method} with value {value}")
+                if method == 'N_best':
+                  engine = get_engine(_AGENT.value, N_preevals=n_preeval, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=value, percentage=None, percentage_epsilon=None)
+                  column_name = _AGENT.value + '_results_depth_' + str(depth) + '_N_best_' + str(value)+ '_preeval_' + str(n_preeval)
+                elif method == 'percentage':
+                  engine = get_engine(_AGENT.value, N_preevals=n_preeval, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=None, percentage=value, percentage_epsilon=None)
+                  column_name = _AGENT.value + '_results_depth_' + str(depth) + '_percentage_' + str(value)+ '_preeval_' + str(n_preeval)
+                elif method == 'percentage_epsilon':
+                  engine = get_engine(_AGENT.value, N_preevals=n_preeval, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=None, percentage=None, percentage_epsilon=value)
+                  column_name = _AGENT.value + '_results_depth_' + str(depth) + '_percentage_epsilon_' + str(value)+ '_preeval_' + str(n_preeval)
+          results_list = []
 
-    for depth in depths:
-        for method in iterative_methods:
-           for value in iterative_methods[method]:
-              logging.info(f"Selected model: depth {depth} with method {method} and value {value}")
-              if method == 'N_best':
-                engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=value, percentage=None, percentage_epsilon=None)
-                column_name = _AGENT.value + '_results_depth_' + str(depth) + '_N_best_' + str(value)
-              elif method == 'percentage':
-                engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=None, percentage=value, percentage_epsilon=None)
-                column_name = _AGENT.value + '_results_depth_' + str(depth) + '_percentage_' + str(value)
-              elif method == 'percentage_epsilon':
-                engine = get_engine(_AGENT.value, depth=depth, reeval_level=depth-1, iter_search_method=method, N_best=None, percentage=None, percentage_epsilon=value)
-                column_name = _AGENT.value + '_results_depth_' + str(depth) + '_percentage_epsilon_' + str(value)
-        results_list = []
+          for i, puzzle in puzzles.iterrows():
+              board = chess.Board(puzzle['FEN'])
+              logging.info("------------------------------------------------------------------------------------------------------------------------------")
 
-        for i, puzzle in puzzles.iterrows():
-            board = chess.Board(puzzle['FEN'])
-            logging.info("------------------------------------------------------------------------------------------------------------------------------")
+              results = analyse_puzzle_from_board_with_LST(
+                  board=board,
+                  engine=engine
+              )
 
-            results = analyse_puzzle_from_board_with_LST(
-                board=board,
-                engine=engine
-            )
+              logging.info(f"Results puzzle {i+1}: {results}")
+              logging.info("------------------------------------------------------------------------------------------------------------------------------")
+              results_list.append(results)
 
-            logging.info(f"Results puzzle {i+1}: {results}")
-            logging.info("------------------------------------------------------------------------------------------------------------------------------")
-            results_list.append(results)
-
-        #column_name = _AGENT.value + '_results_depth_' + str(depth)
-        evaluated_puzzles[column_name] = results_list
+          #column_name = _AGENT.value + '_results_depth_' + str(depth)
+          evaluated_puzzles[column_name] = results_list
     evaluated_puzzles.to_csv(output_file, index=False)
 
   
