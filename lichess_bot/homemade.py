@@ -835,7 +835,7 @@ class AlgorithmProposed(ThinkMoreTemplate):
     """
         Our proposed algorithm. A tree search with 9M evaluations and, in a certain level, a 270M reevaluations
     """
-    def __init__(self,depth=5,reeval_level=2,N_moves_preev=10):
+    def __init__(self,depth=5,reeval_level=2,N_moves_preev=10, iter_method = None, N_best = None, percentage = None, percentage_epsilon = None):
         super().__init__(depth)
         self.nodos_explorados = 0
         # Guardamos el motor 9M en un atributo de la clase para las predicciones oportunas
@@ -929,6 +929,16 @@ class AlgorithmProposed(ThinkMoreTemplate):
         # Guardamos el número de movimientos a preevaluar en un atributo de la clase
         self.N_moves_preev = N_moves_preev
 
+        # Almacenamos el método iterativo para emplearlo en la búsqueda si se indicase
+        self.iter_method = iter_method
+
+        self.N_best = N_best
+        self.percentage = percentage
+        #self.epsilon = epsilon
+        self.percentage_epsilon = percentage_epsilon
+
+
+        self.n_puzzles_hechos = 0
 
 
     def analyse(self , board:chess.Board):
@@ -937,18 +947,16 @@ class AlgorithmProposed(ThinkMoreTemplate):
         # draw_offered: bool,
         # root_moves: MOVE):
             self.nodos_explorados = 0
+            self.nodos_270M_evaluados = 0
+            self.time_9M = 0
+            self.time_270M = 0
+            self.ramas_de_raiz_exploradas=0
          #   top_move = None
             depth = self.depth
             evals = []
-            
+            self.n_puzzles_hechos += 1
 
             # Opposite of our minimax
-            """
-            if board.turn == chess.WHITE:
-                top_eval = -np.inf
-            else:
-                top_eval = np.inf    
-            """
             start_time_preevaluations = time.perf_counter()
             # Now we get ordered legal moves decreasing according to the 270M engine
             win_probs, sorted_legal_moves = self.evaluate_actions_with_270M(board, True)
@@ -956,16 +964,19 @@ class AlgorithmProposed(ThinkMoreTemplate):
             # Ahora asociamos movimientos a sus probabilidades
             move_probs = dict(zip(sorted_legal_moves, win_probs))
 
-            # Ordenamos según probabilidad de forma descendente (mayor a menor prob de victoria)
-            movs_preevaled = sorted(move_probs.items(), key=lambda x: x[1], reverse=True)[:self.N_moves_preev]
+            # Ordenamos según probabilidad según el turno es de negras o blancas
+            
+            aux = sorted(move_probs.items(), key=lambda x: x[1], reverse=True)  
+            movs_preevaled = aux[:self.N_moves_preev]
 
 
+            logging.info("Probabilidades del 270M para cada movimiento: %s", aux)
             #logging.info("All moves %s", move_probs)
-            #logging.info("Info about preevaluations: %s", movs_preevaled)
+            logging.info("Info about preevaluations: %s", movs_preevaled)
             # Nos quedamos solo con esos N mejores movimientos según 270M
             movs_preevaled = [move for move, _ in movs_preevaled]
             end_time_preevaluations = time.perf_counter()
-            #logging.info("Time for preevaluations: %s seconds. Number of moves preevaluated: %s", end_time_preevaluations - start_time_preevaluations, len(movs_preevaled))
+            logging.info("Time for preevaluations: %s seconds. Number of moves preevaluated: %s", end_time_preevaluations - start_time_preevaluations, len(movs_preevaled))
             #print('--------------INIT MINIMAX--------------')
             #logging.info(f"INIT MINIMAX with depth: {depth}")
             # Iteramos sobre los N mejores movimientos según 270M desde el mejor hasta el N-ésimo
@@ -981,6 +992,7 @@ class AlgorithmProposed(ThinkMoreTemplate):
 
                 # WHEN WE ARE BLACK, WE WANT TRUE AND TO GRAB THE SMALLEST VALUE
                 #print("Turno:", board.turn)
+                self.ramas_de_raiz_exploradas+=1
                 eval, _ = self.minimax(board, depth - 1, alpha, beta, board.turn)
 
                 board.pop()
@@ -991,169 +1003,34 @@ class AlgorithmProposed(ThinkMoreTemplate):
                     
                 evals.append(eval)
                 
-                # Nos quedamos con la mejor jugada para el jugador actual
-                """"
-                if eval > top_eval and board.turn == chess.WHITE:
-                    top_move = move
-                    top_eval = eval
-                elif eval < top_eval and board.turn == chess.BLACK:
-                    top_move = move
-                    top_eval = eval
-                """
+      
                 if board.turn == chess.WHITE:
                     alpha = max(alpha, eval)
                 else:
                     beta = min(beta, eval)
                 end_time_move_evaluation = time.perf_counter()
-                #logging.info("Time for move evaluated: %s seconds. Move evaluated: %s", end_time_move_evaluation - start_time_move_evaluation, move)
+                logging.info("Time for move evaluated: %s seconds. Move evaluated: %s. Evaluation: %s. Color player is white: %s", end_time_move_evaluation - start_time_move_evaluation, move, eval, board.turn)
                 
                 #logging.info(f"FINAL EVALUATION OF MOVE {move}: {eval}")
                 if beta <= alpha:
-                    #logging.info("PODA NODO RAIZ")
+                    logging.info("PODA NODO RAIZ")
                     break
 
             #print("CHOSEN MOVE: ", top_move, "WITH EVAL: ", top_eval)
             end_time_algorithm = time.perf_counter()
-            #logging.info("Time for algorithm: %s seconds. Number of moves evaluated: %s", end_time_algorithm - start_time_algorithm, len(movs_preevaled))
-           # #logging.info("Selected move: %s", top_move)
+            logging.info("Time for algorithm: %s seconds. Number of moves evaluated: %s. Depth: %s. Reeval_level: %s. Color playes is white: %s", end_time_algorithm - start_time_algorithm, len(movs_preevaled), self.depth, self.reeval_level, board.turn)
+           # logging.info("Selected move: %s", top_move)
            # #logging.info("Final evaluation of the move: %s", top_eval)
+            logging.info("Se han explorado %s ramas desde el nodo raíz",self.ramas_de_raiz_exploradas)
+            logging.info("Antes de salir del método de clase, la asociación mov-evaluación es\n")
+            logging.info("final Puzzle número %s", self.n_puzzles_hechos)
+            for move, eval in zip(movs_preevaled, evals):
+                logging.info("final minimax Move: %s, Evaluation: %s", move, eval)
 
-
-
-
-
+            logging.info("final ******************************************************")
             # Devolvemos la jugada
-            return {'top_move':PlayResult(None, None),'probs':evals}
-    """
-    def minimax(self, board : chess.Board, depth, alpha, beta, maximizing_player):
-        #print("DEPTH: ", depth)
-        if depth == 0 or board.is_game_over():
-            # Si es game over puede pasar:
-            # - mate: si lo doy yo, 1 si soy blancas (resp. -1 si soy negras), y -1 si me lo da el oponente (resp. ...)
-            # - tablas: 0.5---> hay empate
-            #  ---> Conviene usar 'outcome' de Chess, que da lo que ocurre en el tablero
-            
-            if len(engine.get_ordered_legal_moves(board)) == 0:  # No hay jugadas legales: puede ser jaque mate o tablas
-                situation = board.outcome()
-                #logging.info(f"Situation: {situation}")
-                if situation is not None:
-                    who_wins = situation.winner
-                    if who_wins is None:
-                        # Hay tablas: ahogado, repetición, material insuficiente, etc.
-                        return 0.5, board
-                    elif situation.termination == chess.Termination.CHECKMATE:
-                        return 0.0001, board  # el jugador actual ha perdido
-                else:
-                    #logging.warning("ALGO ANDA MAL: No hay jugadas legales, pero no hay outcome.")
-                    exit()
-
-            #win_probs, _ = self.evaluate_actions_with_9M(board, maximizing_player)
-            win_probs = heuristica_valor_material(board)+random.uniform(0.5, 2.5)
-            aux=""
-            for i in range(self.depth-depth):
-                aux+="#"
-            #logging.info("%s%s",aux,win_probs, "Nodo EVAL")
-            return win_probs, board
-            #if maximizing_player:
-            #    best_win_prob = max(win_probs)
-            #else:
-            #    best_win_prob = min(win_probs)
-            #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
-           # return best_win_prob, board
-        
-
-        best_board = None
-        best_move = None
-        #logging.info("Maximizing player: %s", maximizing_player)
-        if maximizing_player:
-            max_eval = -np.inf
-
-            for move in engine.get_ordered_legal_moves(board):
-                board.push(move)
-                score, to_update_board = self.minimax(board, depth-1, alpha, beta, False)
-                board.pop()
-
-                
-               # #logging.info("%s%s",aux,score," Nodo MAX")
-                if score > max_eval:
-                    max_eval = score
-                    aux=""
-                    for i in range(self.depth-depth):
-                        aux+="#"
-                    #logging.info("Actualising max_eval: %s%s",aux, max_eval, "Nodo MAX")
-                    if to_update_board is not None:
-                        #logging.info("Actualising best_board: %s", to_update_board.fen())
-                    else:
-                        #logging.info("Actualising best_board: None")
-                    best_board = to_update_board
-                    best_move = move
-                
-                if to_update_board is None:
-                    best_board = None
-                alpha = max(alpha, max_eval)
-                if beta <= alpha:
-                    aux="Poda en el depth: "
-                    #logging.info("%s%s",aux, depth)
-                    break
-
-            if depth == self.reeval_level and best_board is not None:
-                #win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
-                #move_probs = dict(zip(sorted_moves, win_probs))
-                #return move_probs.get(best_move, max_eval), None            # Devuelve la prob victoria asociada al mejor mov y, si no existe, devuelve max_eval
-                max_eval = heuristica_valor_posicional_caballo(best_board)
-                aux=""
-                for i in range(self.depth-depth):
-                    aux+="#"
-                aux+="Reevaluating with a stronger heuristic-->"
-                #logging.info("%s%s",aux, max_eval, "Nodo MAX")
-                return max_eval, None
-            else:
-                return max_eval, best_board
-
-        else:
-            min_eval = np.inf
-
-            for move in engine.get_ordered_legal_moves(board):
-                board.push(move)
-                score, to_update_board = self.minimax(board, depth-1, alpha, beta, True)
-                board.pop()
-                aux=""
-                for i in range(self.depth-depth):
-                    aux+="#"
-               # #logging.info("%s%s",aux,score,"Nodo MIN")
-                if score < min_eval:
-                    min_eval = score
-                    #logging.info("Actualising min_eval: %s%s",aux,min_eval," Nodo MIN")
-                    if to_update_board is not None:
-                        #logging.info("Actualising best_board: %s", to_update_board.fen())
-                    else:
-                        #logging.info("Actualising best_board: None")
-                    best_board = to_update_board
-                    best_move = move
-
-                if to_update_board is None:
-                    best_board = None
-                beta = min(beta, min_eval)
-                if beta <= alpha:
-                    aux="Poda en el depth: "
-                    #logging.info("%s%s",aux, depth)
-                    break 
-
-            if depth == self.reeval_level and best_board is not None:
-                #win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
-                #move_probs = dict(zip(sorted_moves, win_probs))
-                #return move_probs.get(best_move, min_eval), best_board
-                min_eval = heuristica_valor_posicional_caballo(best_board)
-                aux=""
-                for i in range(self.depth-depth):
-                    aux+="#"
-                aux+="Reevaluating with a stronger heuristic-->"
-                #logging.info("%s%s",aux, min_eval, "Nodo MIN")
-                return min_eval, None            
-            else:
-                return min_eval, best_board
-    """
-
+            return {'top_move':movs_preevaled,'probs':evals}
+   
     def minimax(self, board: chess.Board, depth, alpha, beta, maximizing_player):
         self.nodos_explorados += 1
 
@@ -1169,31 +1046,19 @@ class AlgorithmProposed(ThinkMoreTemplate):
                     #logging.warning("No outcome found despite no legal moves.")
                     return 0.5, board
 
-           # if maximizing_player:
-           #     ma_val = -np.inf
-           # else:
-           #     mi_val = np.inf
+            # Medimos el tiempo de la evaluación y mostramos cuántos nodos ha evaluado hasta el momento
+            st_time = time.perf_counter()
             win_probs, _ = self.evaluate_actions_with_9M(board, maximizing_player)
+            et_time = time.perf_counter()
+            self.time_9M+=(et_time-st_time)
+
+            logging.info("Un nodo ha tardado en evaluarse: %s seconds. Nodos evaluados con 9M hasta el momento: %s. Tiempo de evaluación total hasta ahora de nodos con 9M: %s", et_time - st_time, self.nodos_explorados, self.time_9M)
             if maximizing_player:
                 best_win_prob = max(win_probs)
             else:
                 best_win_prob = min(win_probs)
-            #print("BEST WIN PROB: ", win_probability_to_centipawns(best_win_prob))
-            #for m in engine.get_ordered_legal_moves(board):
-            #    value = MiguelHeuristic(m, board)
-            #    if maximizing_player:
-            #        ma_val = max(ma_val, value)
-            #    else:
-            #        mi_val = min(mi_val, value)
 
             aux = "#" * (self.depth - depth)
-            #if maximizing_player:
-                #logging.info("%s Nodo EVAL MAX: %s", aux, ma_val)
-            #    value = ma_val
-            #else:
-                #logging.info("%s Nodo EVAL MIN: %s", aux, mi_val)
-            #    value = mi_val
-
             return best_win_prob, board
 
         best_board = None
@@ -1201,7 +1066,11 @@ class AlgorithmProposed(ThinkMoreTemplate):
 
         if maximizing_player:
             max_eval = -np.inf
-            for move in engine.get_ordered_legal_moves(board):
+            movs = engine.get_ordered_legal_moves(board)
+            if self.iter_method is not None:
+                movs = self.get_best_moves(board,True)
+
+            for move in movs:
                 board.push(move)
                 eval, next_board = self.minimax(board, depth - 1, alpha, beta, False)
                 board.pop()
@@ -1211,15 +1080,23 @@ class AlgorithmProposed(ThinkMoreTemplate):
                     best_board = next_board
                     best_move = move
 
-                alpha = max(alpha, max_eval)
+                alpha = max(alpha, max_eval)    ###### max_eval ---> eval?
                 if beta <= alpha:
                     ###logging.info("%s Poda en profundidad: %d", "#" * (self.depth - depth), depth)
                     break
 
             if depth == self.reeval_level and best_board is not None:
+                st_time = time.perf_counter()
                 win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
-                move_probs = dict(zip(sorted_moves, win_probs))
-                reevaluated = move_probs.get(best_move, max_eval)
+                et_time = time.perf_counter()
+                self.nodos_270M_evaluados+=1
+                self.time_270M+=(et_time-st_time)
+                logging.info("Tiempo en evaluar un nodo con 270M: %s. Nodos evaluados con 270M hasta ahora: %s. Tiempo total empleado en usar 270M: %s",et_time-st_time,self.nodos_270M_evaluados,self.time_270M)
+                #move_probs = dict(zip(sorted_moves, win_probs))
+                logging.info('depurando Probabilidad del mejor movimiento %s antes de 270M: %s', best_move,max_eval)
+                reevaluated = max(win_probs) #move_probs.get(best_move, max_eval)
+                logging.info('depurando Probabilidad del mejor movimiento (no necesariamente %s) después de 270M: %s. Nodos evaluados con 270M: %s', best_move,reevaluated, self.nodos_270M_evaluados)
+                logging.info('depurando Probabilidad de los movimientos %s después de 270M: %s', sorted_moves,win_probs)
                 #logging.info("%s Reevaluating -> %s", "#" * (self.depth - depth), reevaluated)
                 return reevaluated, None
             else:
@@ -1227,7 +1104,11 @@ class AlgorithmProposed(ThinkMoreTemplate):
 
         else:
             min_eval = np.inf
-            for move in engine.get_ordered_legal_moves(board):
+            movs = engine.get_ordered_legal_moves(board)
+            if self.iter_method is not None:
+                movs = self.get_best_moves(board,False)
+
+            for move in movs:
                 board.push(move)
                 eval, next_board = self.minimax(board, depth - 1, alpha, beta, True)
                 board.pop()
@@ -1237,22 +1118,52 @@ class AlgorithmProposed(ThinkMoreTemplate):
                     best_board = next_board
                     best_move = move
 
-                beta = min(beta, min_eval)
+                beta = min(beta, min_eval)      ###### min_eval ---> eval?
                 if beta <= alpha:
                     #logging.info("%s Poda en profundidad: %d", "#" * (self.depth - depth), depth)
                     break
 
             if depth == self.reeval_level and best_board is not None:
+                st_time = time.perf_counter()
                 win_probs, sorted_moves = self.evaluate_actions_with_270M(best_board, True)
-                move_probs = dict(zip(sorted_moves, win_probs))
-                reevaluated = move_probs.get(best_move, min_eval)
+                et_time = time.perf_counter()
+                self.nodos_270M_evaluados+=1
+                self.time_270M+=(et_time-st_time)
+                logging.info("Tiempo en evaluar un nodo con 270M: %s. Nodos evaluados con 270M hasta ahora: %s. Tiempo total empleado en usar 270M: %s",et_time-st_time,self.nodos_270M_evaluados,self.time_270M)
+                #move_probs = dict(zip(sorted_moves, win_probs))
+                logging.info('depurando Probabilidad del mejor movimiento %s antes de 270M: %s', best_move,min_eval)
+                reevaluated = max(win_probs) #move_probs.get(best_move, min_eval)
+                logging.info('depurando Probabilidad del mejor movimiento (no necesariamente %s) después de 270M: %s. Nodos evaluados con 270M: %s', best_move,reevaluated,self.nodos_270M_evaluados)
+                logging.info('depurando Probabilidad de los movimientos %s después de 270M: %s', sorted_moves,win_probs)
                 #logging.info("%s Reevaluating -> %s", "#" * (self.depth - depth), reevaluated)
                 return reevaluated, None
             else:
                 return min_eval, best_board
 
 
-            
+    # Evalua todos los movimientos legales dado un tablero según el modelo 9M y obtiene los mejores según puntuaciones y método iterativo escogido
+    def get_best_moves(self, board: chess.Board, maximize_player):
+            win_probs_iter, sorteed_legal_moves_iter = self.evaluate_actions_with_9M(board, maximize_player)
+            # Ahora ordenamos los movimientos según la probabilidad de victoria de mayor a menor
+            move_probs = dict(zip(sorteed_legal_moves_iter, win_probs_iter))
+            movs_preevaled = sorted(move_probs.items(), key=lambda x: x[1], reverse=True)
+
+            if self.iter_method == "N_best":
+                assert self.N_best is not None
+                movs_for_iter = [move for move, _ in movs_preevaled[:self.N_best]]
+            if self.iter_method == "percentage":
+                assert self.percentage is not None
+                movs_for_iter = [move for move, _ in movs_preevaled[:int(len(movs_preevaled) * self.percentage)]]
+            if self.iter_method == "epsilon":
+                assert self.percentage_epsilon is not None
+                epsilon = self.perc_part_of_max*max(win_probs_iter)
+
+                # Nos quedamos con los movimientos con prob de victoria entre max-epsilon y max
+                movs_for_iter = [move for move, _ in movs_preevaled if move_probs[move] >= max(win_probs_iter) - epsilon]
+
+
+            return movs_for_iter
+
 
     def evaluate_actions_with_9M(self, board, maximizing_player):
         results = self.analyse_without_depth_with_9M(board)
