@@ -18,15 +18,19 @@
 import dataclasses
 import enum
 import functools
-
+import logging
 import haiku as hk
 import jax
 import jax.nn as jnn
 import jax.numpy as jnp
 import numpy as np
+from jax import debug
 
 from searchless_chess.src import constants
 
+def foooo():
+  print('foo')
+  return 1
 
 class PositionalEncodings(enum.Enum):
   SINUSOID = enum.auto()
@@ -102,10 +106,13 @@ class MultiHeadDotProductAttention(hk.Module):
   ) -> jax.Array:
     """Returns the output of the multi-head attention."""
     batch_size, sequence_length, embedding_size = inputs_q.shape
-
-    num_hiddens = self._num_hiddens_per_head * self._num_heads
+    debug.print('inputs_q: {}', inputs_q.shape)
+    debug.print('inputs_kv: {}', inputs_kv.shape)
+    num_hiddens = self._num_hiddens_per_head * self._num_heads    
     q = hk.Linear(num_hiddens, with_bias=False)(inputs_q)
     k = hk.Linear(num_hiddens, with_bias=False)(inputs_kv)
+    debug.print('q: {}', q.shape)
+    debug.print('k: {}', k.shape)
 
     if self._apply_qk_layernorm:
       q = layer_norm(q)
@@ -120,19 +127,29 @@ class MultiHeadDotProductAttention(hk.Module):
     q = jnp.reshape(q, new_shape)
     k = jnp.reshape(k, new_shape)
     v = jnp.reshape(v, new_shape)
+    debug.print('q: {}', q.shape)
+    debug.print('k: {}', k.shape)
+    debug.print('v: {}', v.shape)
 
     # Let b=batch_size, t=seq_len, h=num_heads, and d=num_hiddens_per_head.
     attention = jnp.einsum('bthd,bThd->bhtT', q, k)
     attention *= 1.0 / jnp.sqrt(self._num_hiddens_per_head)
 
+    debug.print('attention: {}', attention.shape)
+    
+    
     if mask is not None:
       attention = jnp.where(mask, attention, jnp.finfo(jnp.float32).min)
-
+    
     normalized_attention = jnn.softmax(attention)
-
+    debug.print('normalized_attention: {}', normalized_attention.shape)
     output = jnp.einsum('bhtT,bThd->bthd', normalized_attention, v)
+    debug.print('output: {}', output.shape)
     output = jnp.reshape(output, (batch_size, sequence_length, num_hiddens))
-    return hk.Linear(embedding_size, with_bias=False)(output)
+    debug.print('output reshaped: {}', output.shape)
+    output = hk.Linear(embedding_size, with_bias=False)(output)
+    debug.print('output final: {}', output.shape)
+    return output
 
 
 def sinusoid_position_encoding(
@@ -182,8 +199,10 @@ def embed_sequences(
   )
   embeddings = embeddings_layer(sequences)
   embeddings *= jnp.sqrt(config.embedding_dim)
-
+  debug.print('embeddings 1: {}', embeddings.shape)
+  
   _, sequence_length, embedding_size = embeddings.shape
+  
   match config.pos_encodings:
     case PositionalEncodings.SINUSOID:
       pos_encodings = sinusoid_position_encoding(
@@ -197,7 +216,12 @@ def embed_sequences(
           vocab_size=config.max_sequence_length,
           embed_dim=embedding_size,
       )(positions)
-  return embeddings + pos_encodings
+  
+  debug.print('pos_encodings: {}', pos_encodings.shape)
+  final_embed = embeddings + pos_encodings
+  debug.print('final_embed: {}', final_embed.shape)
+  
+  return final_embed
 
 
 def layer_norm(x: jax.Array) -> jax.Array:
@@ -254,40 +278,40 @@ def transformer_decoder(
     targets: The integer target values, shape [B, T].
     config: The config to use for the transformer.
   """
-  #print('Init transformer decoder')
-  #print('targets:', targets.shape)
+  debug.print('Init transformer decoder')
+  debug.print('targets: {}', targets.shape)
   # Right shift the targets to get the inputs (the first token is now a 0).
   inputs = shift_right(targets)
-  #print('inputs:', inputs.shape)
+  debug.print('inputs: {}', inputs.shape)
 
   # Embeds the inputs and adds positional encodings.
   embeddings = embed_sequences(inputs, config)
-  #print('embeddings:', embeddings.shape)
+  debug.print('embeddings: {}', embeddings.shape)
 
   h = embeddings
   for _ in range(config.num_layers):
     attention_input = layer_norm(h)
-    #print('attention_input:', attention_input.shape)
+    debug.print('attention_input: {}', attention_input.shape)
     attention = _attention_block(attention_input, config)
-    #print('attention:', attention.shape)
+    debug.print('attention_output: {}', attention.shape)
     h += attention
-    #print('h:', h.shape)
+    debug.print('h: {}', h.shape)
 
     mlp_input = layer_norm(h)
-    #print('mlp_input:', mlp_input.shape)
+    debug.print('mlp_input: {}', mlp_input.shape)
     mlp_output = _mlp_block(mlp_input, config)
-    #print('mlp_output:', mlp_output.shape)
+    debug.print('mlp_output: {}', mlp_output.shape)
     h += mlp_output
-    #print('h:', h.shape)
+    debug.print('h: {}', h.shape)
 
   if config.apply_post_ln:
     h = layer_norm(h)
-    #print('h post ln:', h.shape)
+    #debug.print('h post ln:', h.shape)
   logits = hk.Linear(config.output_size)(h)
-  #print('logits:', logits.shape)
-  #print('End transformer decoder')
+  debug.print('logits: {}', logits.shape)
+  debug.print('End transformer decoder')
   softmax = jnn.log_softmax(logits, axis=-1)
-  #print('softmax:', softmax.shape)
+  debug.print('softmax: {}', softmax.shape)
   return softmax
 
 
