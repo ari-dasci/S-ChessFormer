@@ -1132,7 +1132,7 @@ class AlgorithmProposed(ThinkMoreTemplate):
                 logging.info("Tiempo en evaluar un nodo con 270M: %s. Nodos evaluados con 270M hasta ahora: %s. Tiempo total empleado en usar 270M: %s",et_time-st_time,self.nodos_270M_evaluados,self.time_270M)
                 #move_probs = dict(zip(sorted_moves, win_probs))
                 logging.info('depurando Probabilidad del mejor movimiento %s antes de 270M: %s', best_move,min_eval)
-                reevaluated = max(win_probs) #move_probs.get(best_move, min_eval)
+                reevaluated = 1.0-max(win_probs) #move_probs.get(best_move, min_eval)
                 logging.info('depurando Probabilidad del mejor movimiento (no necesariamente %s) después de 270M: %s. Nodos evaluados con 270M: %s', best_move,reevaluated,self.nodos_270M_evaluados)
                 logging.info('depurando Probabilidad de los movimientos %s después de 270M: %s', sorted_moves,win_probs)
                 #logging.info("%s Reevaluating -> %s", "#" * (self.depth - depth), reevaluated)
