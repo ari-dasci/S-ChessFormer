@@ -1,0 +1,1 @@
+Mapas de atención de todas las jugadas posibles en la posición inicial (primer turno de blancas).
