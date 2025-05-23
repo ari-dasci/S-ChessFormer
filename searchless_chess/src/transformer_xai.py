@@ -266,7 +266,8 @@ def _attention_block(inputs: jax.Array, config: TransformerConfig) -> jax.Array:
 def transformer_decoder(
     targets: jax.Array,
     config: TransformerConfig,
-) -> jax.Array:
+    override_embedding: bool = False,
+) -> (jax.Array, jax.Array): # type: ignore
   """Returns the transformer decoder output, shape [B, T, V].
 
   Follows the LLaMa architecture:
@@ -281,12 +282,15 @@ def transformer_decoder(
   """
   #debug.print('Init transformer decoder')
   #debug.print('targets: {}', targets.shape)
-  # Right shift the targets to get the inputs (the first token is now a 0).
-  inputs = shift_right(targets)
-  #debug.print('inputs: {}', inputs.shape)
 
-  # Embeds the inputs and adds positional encodings.
-  embeddings = embed_sequences(inputs, config)
+  if override_embedding:
+    embeddings = targets
+  else:
+    # Right shift the targets to get the inputs (the first token is now a 0).
+    inputs = shift_right(targets)
+    # Embeds the inputs and adds positional encodings.
+    embeddings = embed_sequences(inputs, config)
+    
   #debug.print('embeddings: {}', embeddings.shape)
 
   attention_maps = []
@@ -327,3 +331,68 @@ def build_transformer_predictor(
   model = hk.transform(functools.partial(transformer_decoder, config=config))
   #model = hk.transform_with_state(functools.partial(transformer_decoder, config=config))
   return constants.Predictor(initial_params=model.init, predict=model.apply)
+
+
+## Gradient based importance
+def compute_token_grad_importance(
+    predictor,      # constants.Predictor
+    params,         # parámetros cargados
+    input_seq,      # np.array shape (1, T) con índices de tokens
+    config,         # TransformerConfig
+    target_class=None,
+):
+    """
+    Calcula la relevancia (gradientes) de cada token de entrada usando override_embedding.
+
+    Returns:
+      importances: np.array shape (T,) con la derivada del log-prob del token objetivo.
+    """
+    # Dimensiones
+    B, T = input_seq.shape
+    V = config.vocab_size
+
+    # 1) Extrae la matriz de embeddings de params
+    tok_emb_matrix = params['embed']['embeddings']
+    pos_emb_matrix = params['embed_1']['embeddings']
+
+    # 2) Construye un one-hot “suave” de tu secuencia
+    one_hot = jax.nn.one_hot(input_seq, V)  # (1, T, V)
+
+    # 3) Define la función de pérdida sobre el one-hot continuo
+    def loss_fn(one_hot_cont):
+        # 1) Proyección one-hot → embeddings
+        token_emb = jnp.einsum('b t v, v d -> b t d', one_hot_cont, tok_emb_matrix)
+        pos_emb = jnp.broadcast_to(pos_emb_matrix[None, :, :], token_emb.shape)
+        final_emb = token_emb + pos_emb
+        
+        # 2) Llamada al modelo en modo override_embedding
+        logp, _ = predictor.predict(
+            params=params,
+            targets=final_emb,
+            rng=None,
+            override_embedding=True,
+            config=config,
+        )
+        # logp: (1, T, V)
+
+        # 3) Extraemos la distribución del último token y la convertimos a (V,)
+        last = logp[0, -1, :]    # shape (V,)
+
+        # 4) Elegimos índice escalar
+        if target_class is None:
+            cls = jnp.argmax(last)   # esto es un escalar de JAX, shape ()
+        else:
+            cls = jnp.array(target_class)  # igualmente scalar
+
+        # 5) Devolvemos un escalar
+        return last[cls]   # shape ()
+
+    # 4) Gradiente del escalar respecto al one-hot continuo
+    grad_fn = jax.grad(loss_fn)
+    grads = grad_fn(one_hot)               # (1, T, V)
+
+    # 5) Para cada posición t, tomamos la componente del token real
+    token_ids = input_seq[0]               # (T,)
+    importances = grads[0, jnp.arange(T), token_ids]  # (T,)
+
+    return np.array(importances)
