@@ -9,6 +9,7 @@ import random
 from lib.engine_wrapper import MinimalEngine
 from lib.lichess_types import MOVE, HOMEMADE_ARGS_TYPE
 import logging
+import gc
 
 # Imports for searchless_chess
 from searchless_chess.src.engines import constants
@@ -167,6 +168,7 @@ class ThinkLess_136M(ExampleEngine):
         # Usamos el motor para realizar la predicción
         predicted_move = self.search_engine.play(board=board).uci()
 
+        gc.collect()
         # Devolvemos la jugada
         return PlayResult(predicted_move, None)
 

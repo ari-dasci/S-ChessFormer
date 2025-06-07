@@ -41,7 +41,7 @@ from typing import Optional, Union, TypedDict, cast
 from types import FrameType
 MULTIPROCESSING_LIST_TYPE = MutableSequence[model.Challenge]
 POOL_TYPE = Pool
-
+import gc
 
 class PlayGameArgsType(TypedDict, total=False):
     """Type hint for `play_game_args`."""
@@ -752,6 +752,7 @@ def play_game(li: lichess.Lichess,
         pgn_record = try_get_pgn_game_record(li, config, game, board, engine)
     final_queue_entries(control_queue, correspondence_queue, game, is_correspondence, pgn_record, pgn_queue)
     delete_takeback_record(game)
+    gc.collect()
 
 
 def read_takeback_record(game: model.Game) -> int:
