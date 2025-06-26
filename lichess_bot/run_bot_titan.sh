@@ -3,7 +3,7 @@
 #SBATCH --job-name=ChessBot                 # Nombre del proceso
 #SBATCH --partition=dios                    # Cola para ejecutar
 #SBATCH --nodelist=titan                    # Servidor para ejecutar
-#SBATCH --gres=gpu:1    sbatch run_bot_titan.sh ThinkLess_9M                    # Número de GPUs a usar
+#SBATCH --gres=gpu:1                       # Número de GPUs a usar
 
 # Verifica que se haya pasado un argumento
 if [ "$#" -ne 1 ]; then

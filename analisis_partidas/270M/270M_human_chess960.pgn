@@ -1,0 +1,22 @@
+
+[Event "casual Chess960 game"]
+[Site "https://lichess.org/JCmbxhQD"]
+[Date "2025.02.27"]
+[White "chechereche"]
+[Black "ThinkLess_270M"]
+[Result "0-1"]
+[GameId "JCmbxhQD"]
+[UTCDate "2025.02.27"]
+[UTCTime "11:11:06"]
+[WhiteElo "1500"]
+[BlackElo "2000"]
+[WhiteTitle "FM"]
+[BlackTitle "BOT"]
+[Variant "Chess960"]
+[TimeControl "600+5"]
+[ECO "?"]
+[Termination "Normal"]
+[FEN "nbrnkrbq/pppppppp/8/8/8/8/PPPPPPPP/NBRNKRBQ w KQkq - 0 1"]
+[SetUp "1"]
+
+1. Nc3 { [%eval 0.04] } 1... f5 { [%eval 0.16] } 2. O-O-O { [%eval -0.65] } 2... g6 { [%eval 0.12] } 3. Nb3 { [%eval -0.44] } 3... c5 { [%eval -0.02] } 4. d3 { [%eval -3.77] } 4... Be5 { [%eval -3.71] } 5. g3 { [%eval -4.38] } 5... Bxc3 { [%eval -4.41] } 6. bxc3 { [%eval -4.37] } 6... Qxc3 { [%eval -4.38] } 7. f4 { [%eval -4.22] } 7... Nb6 { [%eval -4.33] } 8. Bf2 { [%eval -4.82] } 8... Na4 { [%eval -4.97] } 9. Be1 { [%eval -6.35] } 9... Qb2+ { [%eval -6.53] } 10. Kd2 { [%eval -6.2] } 10... Nc3 { [%eval -6.39] } 11. Bf2 { [%eval -6.47] } 11... c4 { [%eval -6.26] } 12. Nd4 { [%eval -6.95] } 12... Qb4 { [%eval -6.82] } 13. Kc1 { [%eval -7.62] } 13... Nxb1 { [%eval -7.85] } 0-1
