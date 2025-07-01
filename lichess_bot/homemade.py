@@ -26,7 +26,7 @@ import io
 import os
 import sys
 import math
-
+import jax
 
 from absl import app
 from absl import flags
@@ -192,6 +192,18 @@ class ThinkLess_270M(ExampleEngine):
 
         # Devolvemos la jugada
         return PlayResult(predicted_move, None)
+    
+    def __del__(self):
+        try:
+            print("Liberando memoria de GPU...")
+            # Borra atributos que puedan estar ocupando memoria
+            del self.search_engine
+
+            # Fuerza la recolección de basura
+            gc.collect()
+            
+        except Exception as e:
+            print(f"Error liberando memoria: {e}")
 
 
 def win_probability_to_centipawns(win_probability: float) -> int:
