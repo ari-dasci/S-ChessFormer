@@ -60,3 +60,6 @@ cd Stockfish/src
 make -j profile-build ARCH=x86-64-avx2
 cd ../../..
 ```
+## Nota
+
+Se ha optado por dividir el trabajo en ramas según quién lo ha realizado. Todo lo relativo a la propuesta algorítmica lo ha realizado Álvaro Rodríguez Gallardo (rama `ProposedAlgorithm`) y lo relativo a explicabilidad lo ha realizado Jorge López Remacho.
